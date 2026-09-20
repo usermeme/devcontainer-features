@@ -19,9 +19,7 @@
     {
       "source": "${localEnv:HOME}/dotfiles",
       "target": "/opt/dotfiles",
-      "type": "bind",
-      "consistency": "cached",
-      "readonly": true
+      "type": "bind"
     }
   ],
   "postCreateCommand": "/usr/local/share/dotfiles/apply-dotfiles.sh"

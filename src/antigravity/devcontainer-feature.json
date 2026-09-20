@@ -17,21 +17,17 @@
     {
       "source": "${localEnv:HOME}/.gemini",
       "target": "/home/node/.gemini",
-      "type": "bind",
-      "consistency": "cached"
+      "type": "bind"
     },
     {
       "source": "${localEnv:HOME}/.agents/skills",
       "target": "/home/node/.agents/skills",
-      "type": "bind",
-      "consistency": "cached",
-      "readonly": true
+      "type": "bind"
     },
     {
       "source": "${localEnv:HOME}/.config/gcloud",
       "target": "/home/node/.config/gcloud",
-      "type": "bind",
-      "readonly": true
+      "type": "bind"
     }
   ],
   "postCreateCommand": "/usr/local/share/antigravity/setup-antigravity.sh"
