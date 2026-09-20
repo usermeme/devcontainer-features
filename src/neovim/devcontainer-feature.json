@@ -1,0 +1,24 @@
+{
+  "id": "neovim",
+  "version": "1.0.0",
+  "name": "Neovim Developer Tools",
+  "description": "Installs the official Neovim release binary (arm64 / x86_64) along with essential developer CLI tools (ripgrep, fd, build-essential, and linter daemons).",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Neovim release version (e.g. 'latest' or 'v0.10.4')"
+    },
+    "installLinters": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install global npm linters/formatters (eslint_d, @fsouza/prettierd)"
+    },
+    "installDevTools": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install ripgrep, fd-find, and build-essential"
+    }
+  },
+  "postCreateCommand": "/usr/local/share/neovim/post-create.sh"
+}

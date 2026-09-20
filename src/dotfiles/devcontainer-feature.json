@@ -1,0 +1,28 @@
+{
+  "id": "dotfiles",
+  "version": "1.0.0",
+  "name": "Dotfiles (GNU Stow)",
+  "description": "Mounts host dotfiles directory and manages configuration symlinks via GNU Stow inside devcontainer.",
+  "options": {
+    "packages": {
+      "type": "string",
+      "default": "",
+      "description": "Comma-separated list of dotfiles packages to stow (e.g. 'nvim,tmux,gemini'). If empty, all subdirectories are stowed."
+    },
+    "target": {
+      "type": "string",
+      "default": "",
+      "description": "Target directory to stow files into. Defaults to user $HOME."
+    }
+  },
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/dotfiles",
+      "target": "/opt/dotfiles",
+      "type": "bind",
+      "consistency": "cached",
+      "readonly": true
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/dotfiles/apply-dotfiles.sh"
+}

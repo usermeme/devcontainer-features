@@ -1,0 +1,8 @@
+{
+  "test-neovim-modern": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+      "neovim": {}
+    }
+  }
+}

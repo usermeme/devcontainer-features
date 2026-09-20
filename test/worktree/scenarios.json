@@ -1,0 +1,9 @@
+{
+  "worktree-scenario": {
+    "image": "ubuntu:focal",
+    "features": {
+      "worktree": {}
+    },
+    "initializeCommand": "mkdir -p \"${localWorkspaceFolder}/../.git\""
+  }
+}

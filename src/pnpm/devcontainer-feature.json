@@ -1,0 +1,36 @@
+{
+  "id": "pnpm",
+  "version": "1.0.0",
+  "name": "pnpm Package Manager",
+  "description": "Enables pnpm with a persistent shared cache/store volume across devcontainers.",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "pnpm version to install or activate"
+    },
+    "runInstall": {
+      "type": "boolean",
+      "default": false,
+      "description": "Run 'pnpm install' automatically during postCreate"
+    },
+    "frozenLockfile": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use --frozen-lockfile when runInstall is true and pnpm-lock.yaml is present"
+    }
+  },
+  "containerEnv": {
+    "PNPM_CONFIG_STORE_DIR": "/home/node/.local/share/pnpm/store",
+    "PNPM_HOME": "/home/node/.local/share/pnpm",
+    "PATH": "/home/node/.local/share/pnpm:/home/node/.local/share/pnpm/bin:${PATH}"
+  },
+  "mounts": [
+    {
+      "source": "pnpm-store",
+      "target": "/home/node/.local/share/pnpm/store",
+      "type": "volume"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/pnpm/setup-pnpm.sh"
+}

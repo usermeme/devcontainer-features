@@ -1,0 +1,34 @@
+{
+  "id": "yarn",
+  "version": "1.0.0",
+  "name": "Yarn Package Manager",
+  "description": "Enables Yarn (v1 Classic or Modern Berry) with a persistent shared cache volume across devcontainers.",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Yarn version or channel (e.g. 'latest', 'berry', '1.22.22')"
+    },
+    "runInstall": {
+      "type": "boolean",
+      "default": false,
+      "description": "Run 'yarn install' automatically during postCreate"
+    },
+    "immutable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use --immutable for Yarn Berry during runInstall"
+    }
+  },
+  "containerEnv": {
+    "YARN_CACHE_FOLDER": "/home/node/.cache/yarn"
+  },
+  "mounts": [
+    {
+      "source": "yarn-cache",
+      "target": "/home/node/.cache/yarn",
+      "type": "volume"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/yarn/setup-yarn.sh"
+}

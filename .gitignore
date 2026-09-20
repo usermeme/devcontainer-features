@@ -1,0 +1,13 @@
+# OS and editor files
+.DS_Store
+*.swp
+*~
+
+# Dependencies
+node_modules/
+
+# Local overrides
+.devcontainer/devcontainer.override.json
+
+# Local temp test artifacts
+.tmp/

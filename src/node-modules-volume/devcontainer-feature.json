@@ -1,0 +1,14 @@
+{
+  "id": "node-modules-volume",
+  "version": "1.0.0",
+  "name": "Node Modules Docker Volume",
+  "description": "Mounts an isolated Docker named volume for node_modules to dramatically improve file I/O performance on macOS/Windows and prevent host pollution.",
+  "mounts": [
+    {
+      "source": "${localWorkspaceFolderBasename}-node_modules",
+      "target": "/workspaces/${localWorkspaceFolderBasename}/node_modules",
+      "type": "volume"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/node-modules-volume/setup-volume.sh"
+}

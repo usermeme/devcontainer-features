@@ -1,0 +1,26 @@
+{
+  "id": "worktree",
+  "version": "1.0.0",
+  "name": "Git Worktree & Monorepo Support",
+  "description": "Configures devcontainer to work seamlessly with Git worktrees by mounting the parent repository .git directory, configuring Git safe directories, and fixing monorepo cache permissions.",
+  "options": {
+    "safeDirectory": {
+      "type": "boolean",
+      "default": true,
+      "description": "Configure Git safe.directory for all paths"
+    },
+    "setupNx": {
+      "type": "boolean",
+      "default": true,
+      "description": "Ensure /workspaces/.nx cache directory exists with appropriate permissions"
+    }
+  },
+  "mounts": [
+    {
+      "source": "${localWorkspaceFolder}/../.git",
+      "target": "/workspaces/.git",
+      "type": "bind"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/worktree/setup-worktree.sh"
+}
