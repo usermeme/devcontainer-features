@@ -7,6 +7,28 @@ echo "[opencode] Setting up OpenCode environment..."
 
 CURRENT_USER="$(id -u):$(id -g)"
 
+SUDO=""
+if [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1; then
+  SUDO="sudo"
+fi
+
+# OpenCode uses four XDG directories, but only config and data are bind-mounted from the
+# host: ~/.local/state and ~/.cache have to be created by the container user itself.
+# Feature install scripts run as root, so the ancestors (~/.local, ~/.local/share) can be
+# baked into the image root-owned, and OpenCode then fails before it can create anything:
+#   Error: EACCES: permission denied, mkdir '/home/node/.local/state'
+# Hand those ancestors back to whoever is actually running the container.
+# Non-recursive on purpose: ~/.config/opencode and ~/.local/share/opencode are bind mounts
+# of the developer's real home directory, so chown -R / chmod -R would write through to
+# host files (and 777 would expose them to every user in the image).
+for DIR in "$HOME/.cache" "$HOME/.config" "$HOME/.local" "$HOME/.local/share"; do
+  $SUDO mkdir -p "$DIR" 2>/dev/null || mkdir -p "$DIR" 2>/dev/null || true
+  $SUDO chown "$CURRENT_USER" "$DIR" 2>/dev/null || chown "$CURRENT_USER" "$DIR" 2>/dev/null || true
+  if [ ! -w "$DIR" ]; then
+    echo "[opencode] WARNING: $DIR is not writable by $CURRENT_USER; OpenCode may fail to start."
+  fi
+done
+
 # Link a directory mounted under /home/node into the current user's HOME,
 # replacing it only when the target is absent or an empty directory.
 link_mounted_dir() {
