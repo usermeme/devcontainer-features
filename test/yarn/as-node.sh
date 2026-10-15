@@ -18,5 +18,6 @@ check "cache volume is not world-writable" test -z "$(find /home/node/.cache/yar
 check "run setup-yarn as node" as_node /usr/local/share/yarn/setup-yarn.sh
 check "cache volume is writable by node" as_node 'touch /home/node/.cache/yarn/probe && rm /home/node/.cache/yarn/probe'
 check "yarn runs as node" as_node 'cd /tmp && yarn --version'
+check "yarn resolves to the Corepack shim" as_node '[ "$(command -v yarn)" = /usr/local/share/corepack-shims/yarn ]'
 
 reportResults

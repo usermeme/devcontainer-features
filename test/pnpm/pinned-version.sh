@@ -13,8 +13,9 @@ as_node() {
 
 # Regression: `corepack prepare` ran as root and recorded the version under /root, so the
 # remote user silently got a different pnpm.
-# Print what was resolved, so a failure shows which pnpm ran and what Corepack recorded
-as_node 'echo "pnpm on PATH: $(command -v pnpm) -> $(readlink -f "$(command -v pnpm)")"; echo "PATH=$PATH"; echo "COREPACK_HOME=$COREPACK_HOME"; cat "$COREPACK_HOME/lastKnownGood.json" 2>&1; cd /tmp && echo "pnpm --version: $(pnpm --version)"' || true
+# The official Node feature preinstalls the latest pnpm in /usr/local/share/npm-global/bin,
+# which used to shadow the version activated through Corepack.
+check "pnpm resolves to the Corepack shim" as_node '[ "$(command -v pnpm)" = /usr/local/share/corepack-shims/pnpm ]'
 check "node gets the pinned pnpm" as_node 'cd /tmp && [ "$(pnpm --version)" = 9.15.0 ]'
 
 reportResults

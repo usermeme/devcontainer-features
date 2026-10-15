@@ -23,7 +23,8 @@
   "containerEnv": {
     "YARN_CACHE_FOLDER": "/home/node/.cache/yarn",
     "YARN_GLOBAL_FOLDER": "/home/node/.cache/yarn/berry",
-    "COREPACK_HOME": "/usr/local/share/corepack"
+    "COREPACK_HOME": "/usr/local/share/corepack",
+    "PATH": "/usr/local/share/corepack-shims:${PATH}"
   },
   "mounts": [
     {

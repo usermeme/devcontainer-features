@@ -215,12 +215,16 @@ drop_world_write() {
 # COREPACK_HOME is shared and owned by OWNER: by default Corepack records the activated
 # version under root's ~/.cache, the remote user never sees it and silently gets another one.
 # devcontainer-feature.json sets the same COREPACK_HOME in containerEnv for runtime.
+# Shims go to a dedicated root-owned dir placed first on PATH by containerEnv: base images
+# often ship their own pnpm/yarn (the official Node feature preinstalls pnpm into
+# /usr/local/share/npm-global/bin), which would otherwise shadow the activated version.
 COREPACK_SHARED_HOME="/usr/local/share/corepack"
+COREPACK_SHIMS="/usr/local/share/corepack-shims"
 corepack_activate() {
   command -v corepack >/dev/null 2>&1 || return 1
   export COREPACK_HOME="$COREPACK_SHARED_HOME"
-  mkdir -p "$COREPACK_HOME"
-  corepack enable "$1" || warn "corepack enable $1 failed"
+  mkdir -p "$COREPACK_HOME" "$COREPACK_SHIMS"
+  corepack enable --install-directory "$COREPACK_SHIMS" "$1" || return 1
   corepack prepare "$1@$2" --activate || return 1
   # Image-local dir created by this feature, not a mount: recursive chown is safe here.
   chown -R "$OWNER:$OWNER_GROUP" "$COREPACK_HOME"

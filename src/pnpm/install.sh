@@ -57,7 +57,7 @@ cat <<'PROFILE' >/etc/profile.d/pnpm.sh
 export PNPM_HOME="/home/node/.local/share/pnpm"
 export PNPM_CONFIG_STORE_DIR="/home/node/.local/share/pnpm/store"
 export COREPACK_HOME="/usr/local/share/corepack"
-export PATH="/home/node/.local/share/pnpm:/home/node/.local/share/pnpm/bin:$PATH"
+export PATH="/home/node/.local/share/pnpm:/home/node/.local/share/pnpm/bin:/usr/local/share/corepack-shims:$PATH"
 PROFILE
 chmod 644 /etc/profile.d/pnpm.sh
 
