@@ -37,9 +37,13 @@ if ! command -v pnpm &>/dev/null; then
     fetch https://get.pnpm.io/install.sh "$PNPM_INSTALLER" || die "could not download the pnpm installer"
     PNPM_HOME=/usr/local/share/pnpm-standalone PNPM_VERSION="$VERSION" SHELL=bash sh "$PNPM_INSTALLER"
     rm -f "$PNPM_INSTALLER"
-    if [ -x /usr/local/share/pnpm-standalone/pnpm ]; then
-      ln -sf /usr/local/share/pnpm-standalone/pnpm /usr/local/bin/pnpm
-    fi
+    # pnpm < 11 puts the binary in $PNPM_HOME, newer releases in $PNPM_HOME/bin
+    for PNPM_BIN in /usr/local/share/pnpm-standalone/bin/pnpm /usr/local/share/pnpm-standalone/pnpm; do
+      if [ -x "$PNPM_BIN" ]; then
+        ln -sf "$PNPM_BIN" /usr/local/bin/pnpm
+        break
+      fi
+    done
   fi
 fi
 command -v pnpm &>/dev/null || die "pnpm $VERSION could not be installed."
