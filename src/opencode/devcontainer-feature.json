@@ -1,6 +1,6 @@
 {
   "id": "opencode",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "OpenCode CLI & Host Environment",
   "description": "Installs the OpenCode CLI and mounts host config (~/.config/opencode) and credentials (~/.local/share/opencode) for seamless AI pair-programming inside devcontainer.",
   "options": {

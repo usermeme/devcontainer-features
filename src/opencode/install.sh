@@ -16,9 +16,40 @@ if ! command -v curl &>/dev/null || ! command -v tar &>/dev/null; then
   fi
 fi
 
-# Pre-create mount point directories
-mkdir -p /home/node/.config/opencode /home/node/.local/share/opencode /home/node/.opencode/bin
-chmod -R 777 /home/node/.config/opencode /home/node/.local/share/opencode /home/node/.opencode 2>/dev/null || true
+# Feature install scripts run as root, so everything created under /home/node has to be handed
+# back to the remote user - including the ancestors. Leaving ~/.local or ~/.local/share
+# root-owned breaks OpenCode at startup: it also needs ~/.local/state, which is *not* mounted
+# from the host, and it cannot create a sibling inside a directory it does not own
+#   Error: EACCES: permission denied, mkdir '/home/node/.local/state'
+# The mount targets are hard-coded to /home/node by this feature's devcontainer-feature.json;
+# the owner is looked up by name from _REMOTE_USER_HOME so it survives the UID remap.
+# No 777: ~/.config/opencode and ~/.local/share/opencode are bind mounts of the developer's
+# real home (OpenCode keeps its session database there), and a world-writable copy of them
+# would be readable and tamperable by any user in the image.
+REMOTE_USER="$(awk -F: -v h="${_REMOTE_USER_HOME:-/home/node}" '$6==h{print $1; exit}' /etc/passwd || true)"
+
+MOUNT_TARGETS=(
+  /home/node/.config/opencode
+  /home/node/.local/share/opencode
+)
+XDG_ANCESTORS=(
+  /home/node/.cache
+  /home/node/.config
+  /home/node/.local
+  /home/node/.local/share
+)
+OPENCODE_HOME=(
+  /home/node/.opencode
+  /home/node/.opencode/bin
+)
+
+mkdir -p "${MOUNT_TARGETS[@]}" "${XDG_ANCESTORS[@]}" "${OPENCODE_HOME[@]}"
+chmod 755 "${MOUNT_TARGETS[@]}" "${XDG_ANCESTORS[@]}" "${OPENCODE_HOME[@]}"
+# Best effort: images without that user (e.g. the plain ubuntu test base) keep root ownership
+# and setup-opencode.sh fixes ownership at container start using the real uid.
+if [ -n "$REMOTE_USER" ]; then
+  chown "$REMOTE_USER" "${MOUNT_TARGETS[@]}" "${XDG_ANCESTORS[@]}" "${OPENCODE_HOME[@]}" 2>/dev/null || true
+fi
 
 # Detect architecture and libc for the official OpenCode binary
 ARCH=$(uname -m)
