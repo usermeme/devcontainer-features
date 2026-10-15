@@ -1,83 +1,109 @@
 #!/usr/bin/env bash
 set -e
 
-export DEBIAN_FRONTEND=noninteractive
+FEATURE=neovim
+# shellcheck source=../../lib/common.sh
+source "$(dirname "$0")/common.sh"
+
 export TZ=Etc/UTC
 
 VERSION="${VERSION:-latest}"
-INSTALL_DEV_TOOLS="${INSTALLDEVTOOLS:-true}"
-INSTALL_LINTERS="${INSTALLLINTERS:-true}"
+INSTALLDEVTOOLS="${INSTALLDEVTOOLS:-true}"
+INSTALLLINTERS="${INSTALLLINTERS:-true}"
 
-echo "Installing Neovim feature (version: $VERSION)..."
+log "Installing Neovim feature (version: $VERSION)..."
 
-# Install dev tools (ripgrep, fd, build-essential, curl, tar)
-if [ "$INSTALL_DEV_TOOLS" = "true" ]; then
-  if [ -x "$(command -v apt-get)" ]; then
-    apt-get update -y
-    apt-get install -y --no-install-recommends ripgrep fd-find build-essential curl tar ca-certificates
-    rm -rf /var/lib/apt/lists/*
-  elif [ -x "$(command -v apk)" ]; then
-    apk add --no-cache ripgrep fd build-base curl tar ca-certificates
+# curl/tar are needed for the download whether or not the dev tools are wanted
+ensure_download_tools
+
+if [ "$INSTALLDEVTOOLS" = "true" ]; then
+  if command -v apt-get &>/dev/null; then
+    install_packages ripgrep fd-find build-essential
+  elif command -v apk &>/dev/null; then
+    install_packages ripgrep fd build-base
+  else
+    warn "no supported package manager; skipping ripgrep, fd and build tools"
   fi
 
-  # Symlink fd if fdfind exists
+  # Debian/Ubuntu ship fd as fdfind
   if command -v fdfind &>/dev/null && ! command -v fd &>/dev/null; then
     ln -sf "$(command -v fdfind)" /usr/local/bin/fd
   fi
 fi
 
-# Detect architecture for Neovim binary
-ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m)
-if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-  NVIM_ARCH="arm64"
-else
-  NVIM_ARCH="x86_64"
+# Official release binaries exist for x86_64 and arm64 only; other architectures use the
+# distro package below instead of downloading a binary that cannot run.
+case "$(uname -m)" in
+  x86_64 | amd64) NVIM_ARCH="x86_64" ;;
+  aarch64 | arm64) NVIM_ARCH="arm64" ;;
+  *) NVIM_ARCH="" ;;
+esac
+
+# Release tags carry a "v" prefix; accept "0.10.4" as well as "v0.10.4".
+NVIM_TAG="$VERSION"
+case "$NVIM_TAG" in
+  latest | v*) ;;
+  *) NVIM_TAG="v$NVIM_TAG" ;;
+esac
+
+if [ -n "$NVIM_ARCH" ]; then
+  if [ "$NVIM_TAG" = "latest" ]; then
+    NVIM_BASE_URL="https://github.com/neovim/neovim/releases/latest/download"
+  else
+    NVIM_BASE_URL="https://github.com/neovim/neovim/releases/download/$NVIM_TAG"
+  fi
+  # Releases before v0.10.4 named the x86_64 archive nvim-linux64.tar.gz
+  NVIM_ASSETS="nvim-linux-$NVIM_ARCH.tar.gz"
+  [ "$NVIM_ARCH" = "x86_64" ] && NVIM_ASSETS="$NVIM_ASSETS nvim-linux64.tar.gz"
+
+  # Neovim releases publish no checksum file, so integrity relies on HTTPS to GitHub.
+  TMP_DIR="$(mktemp -d)"
+  NVIM_ARCHIVE=""
+  for asset in $NVIM_ASSETS; do
+    log "Downloading $NVIM_BASE_URL/$asset..."
+    if fetch "$NVIM_BASE_URL/$asset" "$TMP_DIR/nvim.tar.gz"; then
+      NVIM_ARCHIVE="$TMP_DIR/nvim.tar.gz"
+      break
+    fi
+  done
+  if [ -n "$NVIM_ARCHIVE" ]; then
+    # Replace any previous extraction so a rebuild never links a stale version
+    NVIM_TOP="$(tar -tzf "$NVIM_ARCHIVE" | head -n 1 | cut -d/ -f1)"
+    case "$NVIM_TOP" in
+      nvim-*) ;;
+      *) die "unexpected Neovim archive layout (top-level entry: '$NVIM_TOP')" ;;
+    esac
+    NVIM_DIR="/opt/$NVIM_TOP"
+    rm -rf "$NVIM_DIR"
+    tar -C /opt -xzf "$NVIM_ARCHIVE"
+    ln -sf "$NVIM_DIR/bin/nvim" /usr/local/bin/nvim
+  else
+    warn "Neovim $NVIM_TAG download failed; falling back to the distro package."
+  fi
+  rm -rf "$TMP_DIR"
 fi
 
-echo "Downloading Neovim for architecture: $NVIM_ARCH..."
-if [ "$VERSION" = "latest" ]; then
-  NVIM_URL="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-$NVIM_ARCH.tar.gz"
-else
-  NVIM_URL="https://github.com/neovim/neovim/releases/download/$VERSION/nvim-linux-$NVIM_ARCH.tar.gz"
-fi
-
-curl -fsSL "$NVIM_URL" -o /tmp/nvim.tar.gz
-mkdir -p /opt
-tar -C /opt -xzf /tmp/nvim.tar.gz
-rm -f /tmp/nvim.tar.gz
-
-NVIM_DIR=$(find /opt -maxdepth 1 -name "nvim-linux*" | head -n 1)
-if [ -n "$NVIM_DIR" ] && [ -x "$NVIM_DIR/bin/nvim" ]; then
-  ln -sf "$NVIM_DIR/bin/nvim" /usr/local/bin/nvim
-  echo "Neovim successfully linked to /usr/local/bin/nvim."
-fi
-
-# Check if the binary can execute (glibc compatibility check)
+# Missing, or the prebuilt binary needs a newer glibc than this OS provides
 if ! /usr/local/bin/nvim --version &>/dev/null; then
-  echo "Notice: Prebuilt Neovim binary requires newer glibc than provided by this OS. Falling back to system neovim package..."
+  log "Prebuilt Neovim is not usable here. Falling back to the system neovim package..."
   rm -f /usr/local/bin/nvim
-  if [ -x "$(command -v apt-get)" ]; then
-    apt-get update -y
-    apt-get install -y --no-install-recommends software-properties-common
-    add-apt-repository -y ppa:neovim-ppa/unstable 2>/dev/null || true
-    apt-get update -y
-    apt-get install -y --no-install-recommends neovim
-    rm -rf /var/lib/apt/lists/*
-  elif [ -x "$(command -v apk)" ]; then
-    apk add --no-cache neovim
+  if command -v apt-get &>/dev/null; then
+    install_packages software-properties-common
+    add-apt-repository -y ppa:neovim-ppa/unstable 2>/dev/null || warn "could not add the neovim PPA; using the distro version"
+    install_packages neovim
+  elif command -v apk &>/dev/null; then
+    install_packages neovim
   fi
 fi
+command -v nvim &>/dev/null || die "Neovim could not be installed."
+log "$(nvim --version | head -n 1) installed."
 
-# Install linters if npm is present
-if [ "$INSTALL_LINTERS" = "true" ] && command -v npm &>/dev/null; then
-  echo "Installing eslint_d and @fsouza/prettierd..."
-  npm install -g eslint_d @fsouza/prettierd || true
+if [ "$INSTALLLINTERS" = "true" ] && command -v npm &>/dev/null; then
+  log "Installing eslint_d and @fsouza/prettierd..."
+  npm install -g eslint_d @fsouza/prettierd || warn "linter install failed; post-create will retry."
 fi
 
-# Copy post-create script
-INSTALL_DIR="/usr/local/share/neovim"
-mkdir -p "$INSTALL_DIR"
-cp "$(dirname "$0")/post-create.sh" "$INSTALL_DIR/post-create.sh"
-chmod +x "$INSTALL_DIR/post-create.sh"
+persist_options INSTALLLINTERS
+install_runtime post-create.sh
 
-echo "Neovim feature installation complete."
+log "Neovim feature installation complete."

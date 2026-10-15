@@ -4,5 +4,23 @@
     "features": {
       "neovim": {}
     }
+  },
+  "pinned-legacy-version": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+      "neovim": {
+        "version": "0.10.0",
+        "installDevTools": false
+      }
+    }
+  },
+  "linters-off": {
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+    "remoteUser": "node",
+    "features": {
+      "neovim": {
+        "installLinters": false
+      }
+    }
   }
 }

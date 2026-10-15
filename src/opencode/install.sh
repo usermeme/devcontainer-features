@@ -1,55 +1,24 @@
 #!/usr/bin/env bash
 set -e
 
+FEATURE=opencode
+# shellcheck source=../../lib/common.sh
+source "$(dirname "$0")/common.sh"
+
 VERSION="${VERSION:-latest}"
 
-echo "Installing OpenCode feature (version: $VERSION)..."
+log "Installing OpenCode feature (version: $VERSION)..."
 
-# Ensure curl, tar and ca-certificates
-if ! command -v curl &>/dev/null || ! command -v tar &>/dev/null; then
-  if [ -x "$(command -v apt-get)" ]; then
-    apt-get update -y
-    apt-get install -y --no-install-recommends curl tar ca-certificates bash
-    rm -rf /var/lib/apt/lists/*
-  elif [ -x "$(command -v apk)" ]; then
-    apk add --no-cache curl tar ca-certificates bash
-  fi
-fi
+ensure_download_tools
 
-# Feature install scripts run as root, so everything created under /home/node has to be handed
-# back to the remote user - including the ancestors. Leaving ~/.local or ~/.local/share
-# root-owned breaks OpenCode at startup: it also needs ~/.local/state, which is *not* mounted
-# from the host, and it cannot create a sibling inside a directory it does not own
+# OpenCode creates four XDG dirs on startup (packages/util/src/global.ts in the opencode repo):
+# data and config are bind-mounted from the host, state and cache are not. All of them and
+# their ancestors must belong to the remote user, or OpenCode fails with
 #   Error: EACCES: permission denied, mkdir '/home/node/.local/state'
-# The mount targets are hard-coded to /home/node by this feature's devcontainer-feature.json;
-# the owner is looked up by name from _REMOTE_USER_HOME so it survives the UID remap.
-# No 777: ~/.config/opencode and ~/.local/share/opencode are bind mounts of the developer's
-# real home (OpenCode keeps its session database there), and a world-writable copy of them
-# would be readable and tamperable by any user in the image.
-REMOTE_USER="$(awk -F: -v h="${_REMOTE_USER_HOME:-/home/node}" '$6==h{print $1; exit}' /etc/passwd || true)"
-
-MOUNT_TARGETS=(
-  /home/node/.config/opencode
-  /home/node/.local/share/opencode
-)
-XDG_ANCESTORS=(
-  /home/node/.cache
-  /home/node/.config
-  /home/node/.local
-  /home/node/.local/share
-)
-OPENCODE_HOME=(
-  /home/node/.opencode
-  /home/node/.opencode/bin
-)
-
-mkdir -p "${MOUNT_TARGETS[@]}" "${XDG_ANCESTORS[@]}" "${OPENCODE_HOME[@]}"
-chmod 755 "${MOUNT_TARGETS[@]}" "${XDG_ANCESTORS[@]}" "${OPENCODE_HOME[@]}"
-# Best effort: images without that user (e.g. the plain ubuntu test base) keep root ownership
-# and setup-opencode.sh fixes ownership at container start using the real uid.
-if [ -n "$REMOTE_USER" ]; then
-  chown "$REMOTE_USER" "${MOUNT_TARGETS[@]}" "${XDG_ANCESTORS[@]}" "${OPENCODE_HOME[@]}" 2>/dev/null || true
-fi
+resolve_build_owner
+for rel in .config/opencode .local/share/opencode .local/state/opencode .cache/opencode .opencode/bin; do
+  ensure_owned_dir "$NODE_HOME" "$rel" 755
+done
 
 # Detect architecture and libc for the official OpenCode binary
 ARCH=$(uname -m)
@@ -75,9 +44,9 @@ fi
 # Best effort: when the build has no network access, setup-opencode.sh retries at container startup
 if [ "$VERSION" = "latest" ] && [ -n "$OC_TARGET" ]; then
   OC_URL="https://opencode.ai/update/api/latest/cli/opencode/opencode-$OC_TARGET.tar.gz"
-  echo "Downloading OpenCode from $OC_URL..."
+  log "Downloading OpenCode from $OC_URL..."
   TMP_DIR=$(mktemp -d)
-  if curl -fsSL "$OC_URL" -o "$TMP_DIR/opencode.tar.gz"; then
+  if fetch "$OC_URL" "$TMP_DIR/opencode.tar.gz"; then
     tar -xzf "$TMP_DIR/opencode.tar.gz" -C "$TMP_DIR"
     OC_BIN=$(find "$TMP_DIR" -type f -name opencode | head -n 1)
     if [ -n "$OC_BIN" ]; then
@@ -85,39 +54,36 @@ if [ "$VERSION" = "latest" ] && [ -n "$OC_TARGET" ]; then
       chmod 755 /usr/local/bin/opencode
     fi
   else
-    echo "Warning: OpenCode download failed; setup-opencode.sh will retry during postCreate."
+    warn "OpenCode download failed; setup-opencode.sh will retry during postCreate."
   fi
   rm -rf "$TMP_DIR"
 elif [ "$VERSION" != "latest" ]; then
   # Pinned versions are resolved by the official installer (npm registry packages)
-  echo "Installing OpenCode $VERSION via the official installer..."
+  log "Installing OpenCode $VERSION via the official installer..."
   TMP_HOME=$(mktemp -d)
-  if curl -fsSL https://opencode.ai/v2/install -o "$TMP_HOME/install.sh"; then
-    HOME="$TMP_HOME" bash "$TMP_HOME/install.sh" --version "$VERSION" --no-modify-path || echo "Warning: official installer failed for version $VERSION."
+  if fetch https://opencode.ai/v2/install "$TMP_HOME/install.sh"; then
+    HOME="$TMP_HOME" bash "$TMP_HOME/install.sh" --version "$VERSION" --no-modify-path || warn "official installer failed for version $VERSION."
     if [ -f "$TMP_HOME/.opencode/bin/opencode" ]; then
       cp "$TMP_HOME/.opencode/bin/opencode" /usr/local/bin/opencode
       chmod 755 /usr/local/bin/opencode
     fi
   else
-    echo "Warning: OpenCode installer download failed; setup-opencode.sh will retry during postCreate."
+    warn "OpenCode installer download failed; setup-opencode.sh will retry during postCreate."
   fi
   rm -rf "$TMP_HOME"
 fi
 
 # Verify the binary can execute (glibc/baseline compatibility check)
 if [ -f /usr/local/bin/opencode ] && ! /usr/local/bin/opencode --version &>/dev/null; then
-  echo "Notice: prebuilt OpenCode binary is not runnable on this base image; setup-opencode.sh will retry during postCreate."
+  log "Prebuilt OpenCode binary is not runnable on this base image; setup-opencode.sh will retry during postCreate."
   rm -f /usr/local/bin/opencode
 fi
 
 if [ -f /usr/local/bin/opencode ]; then
-  echo "OpenCode $(/usr/local/bin/opencode --version 2>/dev/null | head -n 1) installed to /usr/local/bin/opencode."
+  log "OpenCode $(/usr/local/bin/opencode --version 2>/dev/null | head -n 1) installed to /usr/local/bin/opencode."
 fi
 
-# Copy runtime setup script
-INSTALL_DIR="/usr/local/share/opencode"
-mkdir -p "$INSTALL_DIR"
-cp "$(dirname "$0")/setup-opencode.sh" "$INSTALL_DIR/setup-opencode.sh"
-chmod +x "$INSTALL_DIR/setup-opencode.sh"
+persist_options VERSION
+install_runtime setup-opencode.sh
 
-echo "OpenCode feature installed successfully."
+log "OpenCode feature installed successfully."

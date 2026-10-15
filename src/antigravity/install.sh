@@ -1,27 +1,26 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Installing Antigravity feature..."
+FEATURE=antigravity
+# shellcheck source=../../lib/common.sh
+source "$(dirname "$0")/common.sh"
 
-# Ensure curl and ca-certificates
+SYMLINKSKILLS="${SYMLINKSKILLS:-true}"
+
+log "Installing Antigravity feature..."
+
 if ! command -v curl &>/dev/null; then
-  if [ -x "$(command -v apt-get)" ]; then
-    apt-get update -y
-    apt-get install -y --no-install-recommends curl ca-certificates bash
-    rm -rf /var/lib/apt/lists/*
-  elif [ -x "$(command -v apk)" ]; then
-    apk add --no-cache curl ca-certificates bash
-  fi
+  install_packages curl ca-certificates bash
 fi
 
-# Pre-create mount point directories
-mkdir -p /home/node/.gemini /home/node/.config /home/node/.agents /home/node/.local/bin
-chmod -R 777 /home/node/.gemini /home/node/.config /home/node/.agents /home/node/.local 2>/dev/null || true
+# Mount points and ~/.local/bin (first on PATH) belong to the remote user, never 777:
+# a world-writable dir on PATH lets any process in the container plant a fake `git` or `sudo`.
+resolve_build_owner
+for rel in .gemini .agents/skills .config/gcloud .local/bin; do
+  ensure_owned_dir "$NODE_HOME" "$rel" 755
+done
 
-# Copy runtime setup script
-INSTALL_DIR="/usr/local/share/antigravity"
-mkdir -p "$INSTALL_DIR"
-cp "$(dirname "$0")/setup-antigravity.sh" "$INSTALL_DIR/setup-antigravity.sh"
-chmod +x "$INSTALL_DIR/setup-antigravity.sh"
+persist_options SYMLINKSKILLS
+install_runtime setup-antigravity.sh
 
-echo "Antigravity feature installed successfully."
+log "Antigravity feature installed successfully."

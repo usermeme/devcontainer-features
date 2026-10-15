@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
-INSTALL_DIR="/usr/local/share/node-modules-volume"
-mkdir -p "$INSTALL_DIR"
-cp "$(dirname "$0")/setup-volume.sh" "$INSTALL_DIR/setup-volume.sh"
-chmod +x "$INSTALL_DIR/setup-volume.sh"
+FEATURE=node-modules-volume
+# shellcheck source=../../lib/common.sh
+source "$(dirname "$0")/common.sh"
 
-echo "Node modules volume feature installed."
+install_runtime setup-volume.sh
+
+log "Node modules volume feature installed."

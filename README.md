@@ -21,7 +21,7 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 
 | Feature | ID | Description |
 |---|---|---|
-| [**Git Worktree**](src/worktree/README.md) | `worktree` | Mounts parent `.git` for worktree support, configures Git `safe.directory`, repairs container `gitdir` pointers, and fixes Nx cache permissions. |
+| [**Git Worktree**](src/worktree/README.md) | `worktree` | Mounts parent `.git` for worktree support, trusts `/workspaces` in Git `safe.directory`, makes the worktree `gitdir` pointer relative (valid on host and container), and fixes Nx cache permissions. |
 | [**Dotfiles (GNU Stow)**](src/dotfiles/README.md) | `dotfiles` | Mounts host `~/dotfiles`, installs GNU Stow, and stows configuration packages into `$HOME`. |
 | [**pnpm**](src/pnpm/README.md) | `pnpm` | Enables Corepack/pnpm, sets up cross-container `pnpm-store` named volume, configures `store-dir`, exports `PNPM_HOME`, and optional auto-install. |
 | [**Yarn**](src/yarn/README.md) | `yarn` | Enables Corepack/yarn (v1 Classic or Modern Berry), configures persistent `yarn-cache` volume, and optional auto-install. |
@@ -29,6 +29,21 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 | [**OpenCode**](src/opencode/README.md) | `opencode` | Installs the OpenCode CLI (official binary, arm64/x64, glibc/musl), mounts host `~/.config/opencode` and `~/.local/share/opencode` (provider credentials). |
 | [**Neovim**](src/neovim/README.md) | `neovim` | Installs official Neovim binary (arm64/x86_64) or compatible release, `ripgrep`, `fd`, `build-essential`, and formatters/linters (`eslint_d`, `prettierd`). |
 | [**Node Modules Volume**](src/node-modules-volume/README.md) | `node-modules-volume` | Isolates `node_modules` into a dedicated Docker named volume for dramatically faster I/O on macOS/Windows. |
+
+### Host paths must exist
+
+Bind mounts are not created on demand: if a host path a feature mounts is missing, the container fails to start. Create them once, or let the project do it before every start:
+
+```json
+"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.local/share/opencode"
+```
+
+| Feature | Host paths |
+|---|---|
+| `worktree` | `<workspace>/../.git` |
+| `dotfiles` | `~/dotfiles` |
+| `antigravity` | `~/.gemini`, `~/.agents/skills`, `~/.config/gcloud` |
+| `opencode` | `~/.config/opencode`, `~/.local/share/opencode` |
 
 ---
 
@@ -84,20 +99,21 @@ Pick the features needed for your project:
 ### `worktree`
 - **Mounts**: `source=${localWorkspaceFolder}/../.git,target=/workspaces/.git,type=bind`
 - **Options**:
-  - `safeDirectory` (boolean, default: `true`): Runs `git config --global --add safe.directory "*"` to avoid dubious ownership issues.
+  - `safeDirectory` (boolean, default: `true`): Trusts `/workspaces/*` (git >= 2.46) or the exact workspace paths in the container's system Git config. Never `*`, which would disable Git's ownership check for every repository.
   - `setupNx` (boolean, default: `true`): Ensures `/workspaces/.nx` cache permissions for the container user.
-- **Auto-Repair**: If your worktree's `.git` file contains absolute host paths (common on macOS), the runtime hook detects it and automatically points it to `/workspaces/.git/worktrees/<branch>` or runs `git worktree repair`.
+- **Auto-Repair**: If your worktree's `.git` file contains an absolute host path, the runtime hook rewrites it to the relative `gitdir: ../.git/worktrees/<name>`, which resolves on both the host and the container.
+- **Caveat**: Don't run `git worktree prune` inside the container: the recorded paths are host paths, so every sibling worktree looks stale and its metadata is deleted on the host. Automatic pruning by `git gc` is disabled in the container.
 
 ### `dotfiles`
-- **Mounts**: `source=${localEnv:HOME}/dotfiles,target=/opt/dotfiles,type=bind,readonly`
+- **Mounts**: `source=${localEnv:HOME}/dotfiles,target=/opt/dotfiles,type=bind`
 - **Options**:
   - `packages` (string, default: `""`): Comma-separated list of packages (e.g. `"nvim,tmux,gemini"`). If empty, all directories are stowed.
   - `target` (string, default: `""`): Target directory (defaults to user's `$HOME`).
-- **Build**: Pre-installs GNU Stow into the image.
+- **Build**: Pre-installs GNU Stow into the image. Packages are stowed with `--no-folding`, so only files are linked and tools writing to `~/.config` never write into your dotfiles repository.
 
 ### `pnpm`
 - **Mounts**: `source=pnpm-store,target=/home/node/.local/share/pnpm/store,type=volume`
-- **Environment**: Exports `PNPM_HOME`, `PNPM_CONFIG_STORE_DIR`, and updates `$PATH`.
+- **Environment**: Exports `PNPM_HOME`, `PNPM_CONFIG_STORE_DIR`, `COREPACK_HOME`, and updates `$PATH`.
 - **Options**:
   - `version` (string, default: `"latest"`): pnpm version.
   - `runInstall` (boolean, default: `false`): Automatically run `pnpm install` in `postCreate`.
@@ -105,19 +121,19 @@ Pick the features needed for your project:
 
 ### `yarn`
 - **Mounts**: `source=yarn-cache,target=/home/node/.cache/yarn,type=volume`
-- **Environment**: Exports `YARN_CACHE_FOLDER`.
+- **Environment**: Exports `YARN_CACHE_FOLDER`, `YARN_GLOBAL_FOLDER` (Yarn Berry's global cache, inside the same volume), and `COREPACK_HOME`.
 - **Options**:
   - `version` (string, default: `"latest"`): Yarn version (e.g. `stable`, `berry`, `1.22.22`).
   - `runInstall` (boolean, default: `false`): Automatically run `yarn install` in `postCreate`.
-  - `immutable` (boolean, default: `true`): Use `--immutable` for Yarn Berry.
+  - `immutable` (boolean, default: `true`): Fail instead of rewriting an out-of-date lockfile (`--immutable` for Yarn Berry, `--frozen-lockfile` for Yarn Classic).
 
 ### `antigravity`
 - **Mounts**:
   - `${localEnv:HOME}/.gemini` -> `/home/node/.gemini`
-  - `${localEnv:HOME}/.agents/skills` -> `/home/node/.agents/skills` (readonly)
-  - `${localEnv:HOME}/.config/gcloud` -> `/home/node/.config/gcloud` (readonly)
+  - `${localEnv:HOME}/.agents/skills` -> `/home/node/.agents/skills`
+  - `${localEnv:HOME}/.config/gcloud` -> `/home/node/.config/gcloud` (read-write: `gcloud` writes its token caches there, so any process in the container can read your gcloud credentials)
 - **Options**:
-  - `symlinkSkills` (boolean, default: `true`): Links `~/.agents/skills` to `~/.gemini/skills`.
+  - `symlinkSkills` (boolean, default: `true`): Links `~/.gemini/skills` to `../.agents/skills` (relative, so the link is valid on the host too). An existing `~/.gemini/skills` is left untouched.
 - **CLI**: Automatically verifies or installs the Antigravity CLI (`agy`).
 
 ### `opencode`
@@ -139,12 +155,16 @@ Pick the features needed for your project:
   - `installDevTools` (boolean, default: `true`).
 
 ### `node-modules-volume`
-- **Mounts**: `source=${localWorkspaceFolderBasename}-node_modules,target=/workspaces/${localWorkspaceFolderBasename}/node_modules,type=volume`
+- **Mounts**: `source=${devcontainerId}-node_modules,target=/workspaces/${localWorkspaceFolderBasename}/node_modules,type=volume` (one volume per dev container, so same-named folders no longer share `node_modules`)
 - Prevents cross-OS filesystem sync performance degradation on macOS and Windows by keeping `node_modules` inside Docker storage.
 
 ---
 
 ## Local Development & Testing
+
+Shared shell helpers live in `lib/common.sh`. Features are published as self-contained folders, so `scripts/sync-lib.sh` (`npm run sync-lib`) copies it to `src/<feature>/common.sh`; edit `lib/common.sh` only and re-run the script. CI fails when a copy drifts, when a script uses `chmod 777`, or when it pipes a download into a shell.
+
+Each feature that touches `$HOME` has a scenario running as the non-root `node` user: the autogenerated test runs as root, where ownership bugs are invisible.
 
 Run tests locally using the Dev Container CLI:
 

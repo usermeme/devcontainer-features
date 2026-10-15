@@ -1,6 +1,6 @@
 {
   "id": "pnpm",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "pnpm Package Manager",
   "description": "Enables pnpm with a persistent shared cache/store volume across devcontainers.",
   "options": {
@@ -23,6 +23,7 @@
   "containerEnv": {
     "PNPM_CONFIG_STORE_DIR": "/home/node/.local/share/pnpm/store",
     "PNPM_HOME": "/home/node/.local/share/pnpm",
+    "COREPACK_HOME": "/usr/local/share/corepack",
     "PATH": "/home/node/.local/share/pnpm:/home/node/.local/share/pnpm/bin:${PATH}"
   },
   "mounts": [

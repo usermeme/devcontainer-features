@@ -1,9 +1,10 @@
 {
   "worktree-scenario": {
-    "image": "ubuntu:focal",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "remoteUser": "vscode",
     "features": {
       "worktree": {}
     },
-    "initializeCommand": "mkdir -p \"${localWorkspaceFolder}/../.git\""
+    "initializeCommand": "mkdir -p \"${localWorkspaceFolder}/../.git/worktrees/wt\" && printf 'gitdir: /nonexistent/host/repo/.git/worktrees/wt\\n' > \"${localWorkspaceFolder}/.git\""
   }
 }
