@@ -1,6 +1,6 @@
 {
   "id": "yarn",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Yarn Package Manager",
   "description": "Enables Yarn (v1 Classic or Modern Berry) with a persistent shared cache volume across devcontainers.",
   "options": {
@@ -17,11 +17,14 @@
     "immutable": {
       "type": "boolean",
       "default": true,
-      "description": "Use --immutable for Yarn Berry during runInstall"
+      "description": "Fail instead of updating the lockfile during runInstall (--immutable for Yarn Berry, --frozen-lockfile for Yarn Classic)"
     }
   },
   "containerEnv": {
-    "YARN_CACHE_FOLDER": "/home/node/.cache/yarn"
+    "YARN_CACHE_FOLDER": "/home/node/.cache/yarn",
+    "YARN_GLOBAL_FOLDER": "/home/node/.cache/yarn/berry",
+    "COREPACK_HOME": "/usr/local/share/corepack",
+    "PATH": "/usr/local/share/corepack-shims:${PATH}"
   },
   "mounts": [
     {

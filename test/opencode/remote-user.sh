@@ -23,7 +23,10 @@ check "~/.local is owned by the remote user" test "$(stat -c %u /home/node/.loca
 check "~/.local/share is owned by the remote user" test "$(stat -c %u /home/node/.local/share)" = "$(id -u node)"
 check "remote user can create ~/.local/state" as_node 'mkdir -p "$HOME/.local/state/probe" && rmdir "$HOME/.local/state/probe"'
 check "remote user can create ~/.local/bin" as_node 'mkdir -p "$HOME/.local/bin/probe" && rmdir "$HOME/.local/bin/probe"'
+check "~/.cache is owned by the remote user" test "$(stat -c %u /home/node/.cache)" = "$(id -u node)"
+check "~/.opencode/bin is not world-writable" test -z "$(find /home/node/.opencode/bin -maxdepth 0 -perm -o+w)"
 check "run setup-opencode as the remote user" as_node '/usr/local/share/opencode/setup-opencode.sh'
+check "remote user can write ~/.local/state/opencode" as_node 'touch "$HOME/.local/state/opencode/probe" && rm "$HOME/.local/state/opencode/probe"'
 check "opencode version as the remote user" as_node 'opencode --version'
 
 reportResults

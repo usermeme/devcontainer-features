@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
+FEATURE=dotfiles
+# shellcheck source=../../lib/common.sh
+source /usr/local/share/dotfiles/common.sh
+load_options
+
 TARGET="${TARGET:-$HOME}"
 PACKAGES="${PACKAGES:-}"
 
@@ -17,28 +22,35 @@ elif [ -d "/home/node/dotfiles" ]; then
 fi
 
 if [ -z "$DOTFILES_DIR" ] || [ ! -d "$DOTFILES_DIR" ]; then
-  echo "[dotfiles] Dotfiles directory not found. Skipping stow."
+  log "Dotfiles directory not found. Skipping stow."
   exit 0
 fi
 
 if ! command -v stow &>/dev/null; then
-  echo "[dotfiles] Warning: GNU Stow is not installed. Skipping dotfiles."
+  warn "GNU Stow is not installed. Skipping dotfiles."
   exit 0
 fi
 
-echo "[dotfiles] Applying dotfiles from $DOTFILES_DIR to target $TARGET..."
+log "Applying dotfiles from $DOTFILES_DIR to target $TARGET..."
 cd -P "$DOTFILES_DIR"
 REAL_DIR="$(pwd -P)"
+
+# --no-folding: link files, never whole directories. Without it stow turns a missing ~/.config
+# into a symlink into the host's dotfiles repo, and every tool's state, cache and tokens
+# written under ~/.config would land in that repo (one `git add -A && git push` from public).
+stow_package() {
+  log "Stowing package: $1"
+  stow --no-folding --dir="$REAL_DIR" --target="$TARGET" -R "$1" || warn "failed to stow $1"
+}
 
 if [ -n "$PACKAGES" ]; then
   IFS=',' read -ra PKG_LIST <<< "$PACKAGES"
   for pkg in "${PKG_LIST[@]}"; do
     pkg=$(echo "$pkg" | xargs)
     if [ -d "$pkg" ]; then
-      echo "[dotfiles] Stowing package: $pkg"
-      stow --dir="$REAL_DIR" --target="$TARGET" -R "$pkg" || echo "[dotfiles] Warning: failed to stow $pkg"
+      stow_package "$pkg"
     else
-      echo "[dotfiles] Package directory '$pkg' not found, skipping."
+      log "Package directory '$pkg' not found, skipping."
     fi
   done
 else
@@ -46,11 +58,10 @@ else
     if [ -d "$dir" ]; then
       pkg="${dir%/}"
       if [ "$pkg" != ".git" ]; then
-        echo "[dotfiles] Stowing package: $pkg"
-        stow --dir="$REAL_DIR" --target="$TARGET" -R "$pkg" || echo "[dotfiles] Warning: failed to stow $pkg"
+        stow_package "$pkg"
       fi
     fi
   done
 fi
 
-echo "[dotfiles] Dotfiles setup finished."
+log "Dotfiles setup finished."

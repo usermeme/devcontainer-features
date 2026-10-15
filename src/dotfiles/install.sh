@@ -1,26 +1,22 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Installing dotfiles feature..."
+FEATURE=dotfiles
+# shellcheck source=../../lib/common.sh
+source "$(dirname "$0")/common.sh"
 
-# Install GNU stow
+PACKAGES="${PACKAGES:-}"
+TARGET="${TARGET:-}"
+
+log "Installing dotfiles feature..."
+
 if ! command -v stow &>/dev/null; then
-  echo "Installing GNU Stow..."
-  if [ -x "$(command -v apt-get)" ]; then
-    apt-get update -y
-    apt-get install -y --no-install-recommends stow
-    rm -rf /var/lib/apt/lists/*
-  elif [ -x "$(command -v apk)" ]; then
-    apk add --no-cache stow
-  elif [ -x "$(command -v dnf)" ]; then
-    dnf install -y stow
-  fi
+  log "Installing GNU Stow..."
+  install_packages stow || true
 fi
+command -v stow &>/dev/null || die "GNU Stow could not be installed on this image (on RHEL-based images enable EPEL first)."
 
-# Copy script to system share location
-INSTALL_DIR="/usr/local/share/dotfiles"
-mkdir -p "$INSTALL_DIR"
-cp "$(dirname "$0")/apply-dotfiles.sh" "$INSTALL_DIR/apply-dotfiles.sh"
-chmod +x "$INSTALL_DIR/apply-dotfiles.sh"
+persist_options PACKAGES TARGET
+install_runtime apply-dotfiles.sh
 
-echo "Dotfiles feature installed successfully."
+log "Dotfiles feature installed successfully."

@@ -1,0 +1,9 @@
+{
+  "as-node": {
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+    "remoteUser": "node",
+    "features": {
+      "node-modules-volume": {}
+    }
+  }
+}

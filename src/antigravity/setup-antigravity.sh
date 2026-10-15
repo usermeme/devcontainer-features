@@ -1,50 +1,57 @@
 #!/usr/bin/env bash
 set -e
 
+FEATURE=antigravity
+# shellcheck source=../../lib/common.sh
+source /usr/local/share/antigravity/common.sh
+load_options
+
 SYMLINK_SKILLS="${SYMLINKSKILLS:-true}"
 
-echo "[antigravity] Setting up directory permissions..."
+log "Setting up Antigravity environment..."
 
-CURRENT_USER="$(id -u):$(id -g)"
-sudo mkdir -p "$HOME/.local/bin" "$HOME/.config" "$HOME/.gemini" 2>/dev/null || mkdir -p "$HOME/.local/bin" "$HOME/.config" "$HOME/.gemini"
-sudo chown -R "$CURRENT_USER" "$HOME/.local" 2>/dev/null || chown -R "$CURRENT_USER" "$HOME/.local" 2>/dev/null || true
-sudo chown "$CURRENT_USER" "$HOME/.config" 2>/dev/null || chown "$CURRENT_USER" "$HOME/.config" 2>/dev/null || true
-sudo chown -R "$CURRENT_USER" "$HOME/.gemini" 2>/dev/null || true
+resolve_owner
 
-# If running as non-node user, link the node mounted paths
-if [ "$HOME" != "/home/node" ]; then
-  if [ -d "/home/node/.gemini" ] && [ ! -e "$HOME/.gemini" ]; then
-    ln -sfn /home/node/.gemini "$HOME/.gemini" 2>/dev/null || true
-  fi
-  if [ -d "/home/node/.agents" ] && [ ! -e "$HOME/.agents" ]; then
-    ln -sfn /home/node/.agents "$HOME/.agents" 2>/dev/null || true
-  fi
-  if [ -d "/home/node/.config/gcloud" ]; then
-    mkdir -p "$HOME/.config"
-    ln -sfn /home/node/.config/gcloud "$HOME/.config/gcloud" 2>/dev/null || true
-  fi
-fi
+# Non-node users reach the host mounts under /home/node. Linking has to happen before
+# anything below creates these paths, otherwise the host credentials are never visible.
+link_from_node_home .gemini
+link_from_node_home .agents
+link_from_node_home .config/gcloud
+
+# Only the container-side dirs are fixed, non-recursively: ~/.gemini and ~/.config/gcloud are
+# bind mounts of the developer's home, and chown on them rewrites host file ownership.
+for rel in .local/bin .config .gemini; do
+  ensure_owned_dir "$HOME" "$rel"
+done
+warn_unless_writable "$HOME/.gemini"
 
 # Install Antigravity CLI if missing
 if ! command -v agy &>/dev/null && ! command -v antigravity &>/dev/null; then
-  echo "[antigravity] Installing Antigravity CLI..."
-  curl -fsSL https://antigravity.google/cli/install.sh | bash || echo "[antigravity] Antigravity CLI install skipped (network unreachable or offline)."
+  log "Installing Antigravity CLI..."
+  AGY_INSTALLER="$(mktemp)"
+  if fetch https://antigravity.google/cli/install.sh "$AGY_INSTALLER"; then
+    bash "$AGY_INSTALLER" || warn "Antigravity CLI install failed."
+  else
+    warn "Antigravity CLI install skipped (network unreachable or offline)."
+  fi
+  rm -f "$AGY_INSTALLER"
 fi
 
-# Symlink skills if configured
+# ~/.gemini is the host's directory, so the link is relative: ../.agents/skills resolves to
+# the skills dir both in the container and on the host, instead of a dangling /home/node path.
+# 1.0.0 wrote such an absolute link; it is replaced. Anything else at ~/.gemini/skills is the
+# developer's and is left alone.
 if [ "$SYMLINK_SKILLS" = "true" ]; then
-  SKILLS_DIR=""
-  if [ -d "$HOME/.agents/skills" ]; then
-    SKILLS_DIR="$HOME/.agents/skills"
-  elif [ -d "/home/node/.agents/skills" ]; then
-    SKILLS_DIR="/home/node/.agents/skills"
+  SKILLS_LINK="$HOME/.gemini/skills"
+  if [ -L "$SKILLS_LINK" ] && [ "$(readlink "$SKILLS_LINK")" = "$NODE_HOME/.agents/skills" ]; then
+    rm -f "$SKILLS_LINK" || warn "could not replace the absolute link $SKILLS_LINK"
   fi
-
-  if [ -n "$SKILLS_DIR" ]; then
-    echo "[antigravity] Symlinking skills from $SKILLS_DIR to $HOME/.gemini/skills..."
-    mkdir -p "$HOME/.gemini"
-    ln -sfn "$SKILLS_DIR" "$HOME/.gemini/skills"
+  if [ -e "$SKILLS_LINK" ] || [ -L "$SKILLS_LINK" ]; then
+    log "$SKILLS_LINK already exists; leaving it as is."
+  elif [ -d "$HOME/.gemini/../.agents/skills" ]; then
+    log "Linking $SKILLS_LINK -> ../.agents/skills"
+    ln -s ../.agents/skills "$SKILLS_LINK" || warn "could not create $SKILLS_LINK (is ~/.gemini writable?)"
   fi
 fi
 
-echo "[antigravity] Antigravity setup finished."
+log "Antigravity setup finished."

@@ -1,37 +1,44 @@
 #!/usr/bin/env bash
 set -e
 
+FEATURE=yarn
+# shellcheck source=../../lib/common.sh
+source /usr/local/share/yarn/common.sh
+load_options
+
 RUN_INSTALL="${RUNINSTALL:-false}"
 IMMUTABLE="${IMMUTABLE:-true}"
 
-echo "[yarn] Configuring yarn cache permissions..."
-CACHE_DIR="/home/node/.cache/yarn"
-CURRENT_USER="$(id -u):$(id -g)"
+CACHE_DIR="$NODE_HOME/.cache/yarn"
 
-if [ -d "$CACHE_DIR" ]; then
-  sudo chown -R "$CURRENT_USER" "$CACHE_DIR" 2>/dev/null || chown -R "$CURRENT_USER" "$CACHE_DIR" 2>/dev/null || true
-else
-  sudo mkdir -p "$CACHE_DIR" 2>/dev/null || mkdir -p "$CACHE_DIR"
-  sudo chown -R "$CURRENT_USER" "$CACHE_DIR" 2>/dev/null || chown -R "$CURRENT_USER" "$CACHE_DIR" 2>/dev/null || true
-fi
+log "Configuring yarn cache..."
 
-# Ensure user's home cache dir links to /home/node/.cache/yarn if running as different user
-if [ "$HOME" != "/home/node" ] && [ -d "$CACHE_DIR" ]; then
-  mkdir -p "$HOME/.cache"
-  ln -sfn "$CACHE_DIR" "$HOME/.cache/yarn" 2>/dev/null || true
-fi
+resolve_owner
+
+link_from_node_home .cache/yarn
+
+ensure_owned_dir "$NODE_HOME" .cache
+# yarn-cache is a named volume shared by every devcontainer on this machine. Only its top
+# level is claimed, and only when it is not ours: a recursive chown would walk the whole
+# cache on every create and take files away from projects running under another uid.
+claim_dir "$CACHE_DIR"
+drop_world_write "$CACHE_DIR"
+claim_corepack_home
+warn_unless_writable "$CACHE_DIR"
 
 if [ "$RUN_INSTALL" = "true" ]; then
   if [ -f "yarn.lock" ] || [ -f "package.json" ]; then
-    echo "[yarn] Installing dependencies..."
+    log "Installing dependencies..."
+    # No silent fallback to a plain install: when the lockfile is out of date the install
+    # must fail, not rewrite yarn.lock behind the developer's back.
     if [ "$IMMUTABLE" = "true" ] && [ -f ".yarnrc.yml" ]; then
       yarn install --immutable
-    elif [ -f "yarn.lock" ]; then
-      yarn install --frozen-lockfile 2>/dev/null || yarn install
+    elif [ "$IMMUTABLE" = "true" ] && [ -f "yarn.lock" ]; then
+      yarn install --frozen-lockfile
     else
       yarn install
     fi
   fi
 fi
 
-echo "[yarn] Yarn setup finished."
+log "Yarn setup finished."

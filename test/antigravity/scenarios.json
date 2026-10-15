@@ -1,0 +1,28 @@
+{
+  "as-node": {
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+    "remoteUser": "node",
+    "features": {
+      "antigravity": {}
+    }
+  },
+  "skills-off": {
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+    "remoteUser": "node",
+    "features": {
+      "antigravity": {
+        "symlinkSkills": false
+      }
+    }
+  },
+  "with-opencode-pnpm-yarn": {
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+    "remoteUser": "node",
+    "features": {
+      "opencode": {},
+      "antigravity": {},
+      "pnpm": {},
+      "yarn": {}
+    }
+  }
+}
