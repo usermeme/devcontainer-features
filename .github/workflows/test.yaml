@@ -19,6 +19,7 @@ jobs:
       - name: "Prepare test environment"
         run: |
           mkdir -p "$HOME/dotfiles" "$HOME/.gemini" "$HOME/.agents/skills" "$HOME/.config/gcloud"
+          mkdir -p "$HOME/.config/opencode" "$HOME/.local/share/opencode"
           # Create mock package in dotfiles for testing
           mkdir -p "$HOME/dotfiles/mockpkg/.config"
           touch "$HOME/dotfiles/mockpkg/.config/mock.conf"
@@ -30,5 +31,6 @@ jobs:
           devcontainer features test --project-folder . -f pnpm
           devcontainer features test --project-folder . -f yarn
           devcontainer features test --project-folder . -f antigravity
+          devcontainer features test --project-folder . -f opencode
           devcontainer features test --project-folder . -f neovim
           devcontainer features test --project-folder . -f node-modules-volume

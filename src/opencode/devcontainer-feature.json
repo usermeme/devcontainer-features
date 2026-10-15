@@ -1,0 +1,29 @@
+{
+  "id": "opencode",
+  "version": "1.0.0",
+  "name": "OpenCode CLI & Host Environment",
+  "description": "Installs the OpenCode CLI and mounts host config (~/.config/opencode) and credentials (~/.local/share/opencode) for seamless AI pair-programming inside devcontainer.",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "OpenCode version to install (e.g. 'latest' or a specific release like '2.0.29')"
+    }
+  },
+  "containerEnv": {
+    "PATH": "/home/node/.opencode/bin:${PATH}"
+  },
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/.config/opencode",
+      "target": "/home/node/.config/opencode",
+      "type": "bind"
+    },
+    {
+      "source": "${localEnv:HOME}/.local/share/opencode",
+      "target": "/home/node/.local/share/opencode",
+      "type": "bind"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/opencode/setup-opencode.sh"
+}
