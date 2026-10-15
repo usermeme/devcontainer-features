@@ -214,7 +214,9 @@ drop_world_write() {
 # corepack_activate TOOL SPEC: activate TOOL@SPEC through Corepack (build time, as root).
 # COREPACK_HOME is shared and owned by OWNER: by default Corepack records the activated
 # version under root's ~/.cache, the remote user never sees it and silently gets another one.
-# devcontainer-feature.json sets the same COREPACK_HOME in containerEnv for runtime.
+# devcontainer-feature.json sets the same COREPACK_HOME in containerEnv for runtime, plus
+# COREPACK_DEFAULT_TO_LATEST=0: otherwise Corepack looks up the registry's latest release on
+# every run in a project without a packageManager field and replaces the activated version.
 COREPACK_SHARED_HOME="/usr/local/share/corepack"
 corepack_activate() {
   command -v corepack >/dev/null 2>&1 || return 1
