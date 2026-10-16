@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
+# postCreate, as the container user: install the linters if the build could not.
 set -e
 
-FEATURE=neovim
-# shellcheck source=../../lib/common.sh
-source /usr/local/share/neovim/common.sh
-load_options
+log() { echo "[neovim] $*"; }
+warn() { echo "[neovim] WARNING: $*" >&2; }
+as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo -n "$@"; fi; }
 
-INSTALL_LINTERS="${INSTALLLINTERS:-true}"
+# shellcheck disable=SC1091
+. /usr/local/share/neovim/options.env
 
-if [ "$INSTALL_LINTERS" = "true" ] && command -v npm &>/dev/null; then
+if [ "$INSTALLLINTERS" = "true" ] && command -v npm &>/dev/null; then
   if ! command -v eslint_d &>/dev/null || ! command -v prettierd &>/dev/null; then
     log "Installing eslint_d and @fsouza/prettierd..."
     # User-writable npm prefixes (nvm) work directly; system prefixes need root. PATH is passed

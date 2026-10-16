@@ -1,6 +1,6 @@
 {
   "id": "neovim",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Neovim Developer Tools",
   "description": "Installs the official Neovim release binary (arm64 / x86_64) along with essential developer CLI tools (ripgrep, fd, build-essential, and linter daemons).",
   "options": {

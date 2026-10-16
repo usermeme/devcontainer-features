@@ -26,6 +26,8 @@ check "remote user can create ~/.local/bin" as_node 'mkdir -p "$HOME/.local/bin/
 check "~/.cache is owned by the remote user" test "$(stat -c %u /home/node/.cache)" = "$(id -u node)"
 check "~/.opencode/bin is not world-writable" test -z "$(find /home/node/.opencode/bin -maxdepth 0 -perm -o+w)"
 check "run setup-opencode as the remote user" as_node '/usr/local/share/opencode/setup-opencode.sh'
+check "data volume is owned by the remote user" test "$(stat -c %u /home/node/.local/share/opencode)" = "$(id -u node)"
+check "remote user can write the data volume" as_node 'touch "$HOME/.local/share/opencode/probe" && rm "$HOME/.local/share/opencode/probe"'
 check "remote user can write ~/.local/state/opencode" as_node 'touch "$HOME/.local/state/opencode/probe" && rm "$HOME/.local/state/opencode/probe"'
 check "opencode version as the remote user" as_node 'opencode --version'
 

@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
+# Build time, as root: install setup-volume.sh.
 set -e
 
-FEATURE=node-modules-volume
-# shellcheck source=../../lib/common.sh
-source "$(dirname "$0")/common.sh"
+mkdir -p /usr/local/share/node-modules-volume
+install -m 755 "$(dirname "$0")/setup-volume.sh" /usr/local/share/node-modules-volume/
 
-install_runtime setup-volume.sh
-
-log "Node modules volume feature installed."
+echo "[node-modules-volume] Node modules volume feature installed."

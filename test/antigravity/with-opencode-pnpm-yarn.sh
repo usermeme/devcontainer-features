@@ -14,7 +14,6 @@ as_node() {
   fi
 }
 
-OPENCODE_DATA_OWNER="$(stat -c %u /home/node/.local/share/opencode)"
 GEMINI_OWNER="$(stat -c %u /home/node/.gemini)"
 
 check "opencode setup as node" as_node /usr/local/share/opencode/setup-opencode.sh
@@ -22,7 +21,8 @@ check "antigravity setup as node" as_node /usr/local/share/antigravity/setup-ant
 check "pnpm setup as node" as_node /usr/local/share/pnpm/setup-pnpm.sh
 check "yarn setup as node" as_node /usr/local/share/yarn/setup-yarn.sh
 
-check "host mount ~/.local/share/opencode ownership unchanged" test "$(stat -c %u /home/node/.local/share/opencode)" = "$OPENCODE_DATA_OWNER"
+check "opencode-data volume is owned by node" test "$(stat -c %U /home/node/.local/share/opencode)" = node
+check "node can write the opencode-data volume" as_node 'touch "$HOME/.local/share/opencode/probe" && rm "$HOME/.local/share/opencode/probe"'
 check "host mount ~/.gemini ownership unchanged" test "$(stat -c %u /home/node/.gemini)" = "$GEMINI_OWNER"
 check "node can create ~/.local/state" as_node 'mkdir -p "$HOME/.local/state/probe" && rmdir "$HOME/.local/state/probe"'
 check "node can create ~/.cache entries" as_node 'mkdir -p "$HOME/.cache/probe" && rmdir "$HOME/.cache/probe"'

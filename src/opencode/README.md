@@ -1,7 +1,7 @@
 
 # OpenCode CLI & Host Environment (opencode)
 
-Installs the OpenCode CLI and mounts host config (~/.config/opencode) and credentials (~/.local/share/opencode) for seamless AI pair-programming inside devcontainer.
+Installs the OpenCode CLI, mounts host config (~/.config/opencode) and keeps logins and sessions (~/.local/share/opencode) in a volume shared by all devcontainers.
 
 ## Example Usage
 

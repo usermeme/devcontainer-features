@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
+# postCreate, as the container user: fix the host .git pointer, trust the workspace, claim .nx.
 set -e
 
-FEATURE=worktree
-# shellcheck source=../../lib/common.sh
-source /usr/local/share/worktree/common.sh
-load_options
+log() { echo "[worktree] $*"; }
+warn() { echo "[worktree] WARNING: $*" >&2; }
+as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo -n "$@"; fi; }
 
-SAFEDIRECTORY="${SAFEDIRECTORY:-true}"
-SETUPNX="${SETUPNX:-true}"
+# shellcheck disable=SC1091
+. /usr/local/share/worktree/options.env
 
 log "Setting up Git and worktree environment..."
-
-resolve_owner
 
 # The worktree's .git file lives in the bind-mounted workspace: it is the host's file.
 # Git writes it with an absolute host path (e.g. /Users/me/repo/.git/worktrees/feat) that does
@@ -54,8 +52,14 @@ if [ "$SAFEDIRECTORY" = "true" ]; then
   done
 fi
 
-if [ "$SETUPNX" = "true" ] && [ -d /workspaces ]; then
-  ensure_owned_dir /workspaces .nx
+# /workspaces/.nx is outside $HOME, so a UID remap on Linux hosts leaves it with the build-time
+# uid. Skipped when it is a mount: chown there would rewrite the host's file ownership.
+NX_DIR=/workspaces/.nx
+if [ "$SETUPNX" = "true" ] && [ -d /workspaces ] &&
+  ! awk -v p="$NX_DIR" '$5==p{found=1} END{exit !found}' /proc/self/mountinfo 2>/dev/null; then
+  [ -d "$NX_DIR" ] || mkdir "$NX_DIR" 2>/dev/null || as_root mkdir "$NX_DIR" || warn "cannot create $NX_DIR"
+  [ ! -d "$NX_DIR" ] || [ -O "$NX_DIR" ] || as_root chown "$(id -u):$(id -g)" "$NX_DIR" ||
+    warn "$NX_DIR is not owned by $(id -un) and could not be fixed (no root/sudo)."
 fi
 
 log "Worktree setup finished."

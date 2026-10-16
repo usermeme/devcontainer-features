@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
+# Build time, as root: install Neovim, optional dev tools and linters, and post-create.sh.
 set -e
 
-FEATURE=neovim
-# shellcheck source=../../lib/common.sh
-source "$(dirname "$0")/common.sh"
+log() { echo "[neovim] $*"; }
+warn() { echo "[neovim] WARNING: $*" >&2; }
+die() {
+  echo "[neovim] ERROR: $*" >&2
+  exit 1
+}
+install_packages() {
+  if command -v apt-get &>/dev/null; then
+    apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@" && rm -rf /var/lib/apt/lists/*
+  elif command -v apk &>/dev/null; then
+    apk add --no-cache "$@"
+  else
+    warn "no supported package manager found to install: $*"
+    return 1
+  fi
+}
 
 export TZ=Etc/UTC
 
@@ -14,7 +28,9 @@ INSTALLLINTERS="${INSTALLLINTERS:-true}"
 log "Installing Neovim feature (version: $VERSION)..."
 
 # curl/tar are needed for the download whether or not the dev tools are wanted
-ensure_download_tools
+if ! command -v curl &>/dev/null || ! command -v tar &>/dev/null; then
+  install_packages curl tar ca-certificates
+fi
 
 if [ "$INSTALLDEVTOOLS" = "true" ]; then
   if command -v apt-get &>/dev/null; then
@@ -61,7 +77,7 @@ if [ -n "$NVIM_ARCH" ]; then
   NVIM_ARCHIVE=""
   for asset in $NVIM_ASSETS; do
     log "Downloading $NVIM_BASE_URL/$asset..."
-    if fetch "$NVIM_BASE_URL/$asset" "$TMP_DIR/nvim.tar.gz"; then
+    if curl -fsSL --proto '=https' --tlsv1.2 --retry 3 "$NVIM_BASE_URL/$asset" -o "$TMP_DIR/nvim.tar.gz"; then
       NVIM_ARCHIVE="$TMP_DIR/nvim.tar.gz"
       break
     fi
@@ -103,7 +119,9 @@ if [ "$INSTALLLINTERS" = "true" ] && command -v npm &>/dev/null; then
   npm install -g eslint_d @fsouza/prettierd || warn "linter install failed; post-create will retry."
 fi
 
-persist_options INSTALLLINTERS
-install_runtime post-create.sh
+# Feature options only exist while install.sh runs: keep them for postCreate.
+mkdir -p /usr/local/share/neovim
+printf 'INSTALLLINTERS=%q\n' "$INSTALLLINTERS" >/usr/local/share/neovim/options.env
+install -m 755 "$(dirname "$0")/post-create.sh" /usr/local/share/neovim/
 
 log "Neovim feature installation complete."

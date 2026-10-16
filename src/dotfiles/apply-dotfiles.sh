@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
+# postCreate, as the container user: stow the host dotfiles packages into $HOME.
 set -e
 
-FEATURE=dotfiles
-# shellcheck source=../../lib/common.sh
-source /usr/local/share/dotfiles/common.sh
-load_options
+log() { echo "[dotfiles] $*"; }
+warn() { echo "[dotfiles] WARNING: $*" >&2; }
+
+# shellcheck disable=SC1091
+. /usr/local/share/dotfiles/options.env
 
 TARGET="${TARGET:-$HOME}"
-PACKAGES="${PACKAGES:-}"
 
 DOTFILES_DIR=""
 if [ -d "$HOME/dotfiles" ]; then

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
+# Build time, as root: configure system git for the shared host .git and install setup-worktree.sh.
 set -e
 
-FEATURE=worktree
-# shellcheck source=../../lib/common.sh
-source "$(dirname "$0")/common.sh"
+log() { echo "[worktree] $*"; }
 
 SAFEDIRECTORY="${SAFEDIRECTORY:-true}"
 SETUPNX="${SETUPNX:-true}"
@@ -12,7 +11,13 @@ log "Installing worktree feature..."
 
 if ! command -v git &>/dev/null; then
   log "Installing Git..."
-  install_packages git ca-certificates
+  if command -v apt-get &>/dev/null; then
+    apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+  elif command -v apk &>/dev/null; then
+    apk add --no-cache git ca-certificates
+  elif command -v dnf &>/dev/null; then
+    dnf install -y git ca-certificates
+  fi
 fi
 
 # Git settings go to the image's system config, never to ~/.gitconfig: with the dotfiles
@@ -33,12 +38,17 @@ if [ "$SAFEDIRECTORY" = "true" ] && [ "$(printf '%s\n' 2.46 "$GIT_VERSION" | sor
     git -C / config --system --add safe.directory '/workspaces/*'
 fi
 
+# The Nx cache belongs to the remote user (any user: nothing here lives in a home dir).
+# setup-worktree.sh claims it again after a UID remap.
 if [ "$SETUPNX" = "true" ]; then
-  resolve_build_owner
-  ensure_owned_dir /workspaces .nx 755
+  OWNER="${_REMOTE_USER:-root}"
+  id "$OWNER" &>/dev/null || OWNER=root
+  install -d -o "$OWNER" -g "$(id -gn "$OWNER")" -m 755 /workspaces/.nx
 fi
 
-persist_options SAFEDIRECTORY SETUPNX
-install_runtime setup-worktree.sh
+# Feature options only exist while install.sh runs: keep them for postCreate.
+mkdir -p /usr/local/share/worktree
+printf 'SAFEDIRECTORY=%q\nSETUPNX=%q\n' "$SAFEDIRECTORY" "$SETUPNX" >/usr/local/share/worktree/options.env
+install -m 755 "$(dirname "$0")/setup-worktree.sh" /usr/local/share/worktree/
 
 log "Worktree feature installed successfully."

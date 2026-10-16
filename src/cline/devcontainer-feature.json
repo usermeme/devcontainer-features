@@ -1,0 +1,24 @@
+{
+  "id": "cline",
+  "version": "1.0.0",
+  "name": "Cline CLI & Host Environment",
+  "description": "Installs the Cline CLI and mounts host settings and credentials (~/.cline/data/settings) for seamless AI pair-programming inside devcontainer.",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Cline CLI version to install (e.g. 'latest' or a specific release like '3.0.72')"
+    }
+  },
+  "containerEnv": {
+    "CLINE_NO_AUTO_UPDATE": "1"
+  },
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/.cline/data/settings",
+      "target": "/home/node/.cline/data/settings",
+      "type": "bind"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/cline/setup-cline.sh"
+}
