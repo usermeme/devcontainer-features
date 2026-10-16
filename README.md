@@ -10,7 +10,7 @@ Team projects often come with a shared `.devcontainer/devcontainer.json`. Howeve
 - You want cross-container persistent caches for package managers (**pnpm**, **yarn**).
 - You want your **Neovim** editor and developer toolchain (ripgrep, fd, linters) ready on every container.
 - You use **Google Antigravity CLI** (`agy`) and want your global skills (`~/.agents/skills`) and Google Cloud credentials mounted seamlessly.
-- You use **OpenCode** and want your logins, global config, agents, and skills ready in every container without re-running `/connect`.
+- You use **OpenCode** and want your global config, agents, and skills in every container, and to log in once for all containers.
 - You use **Cline CLI** and want your provider keys, `cline auth` login, and MCP servers available in every container.
 - You want high-speed **Docker volumes for `node_modules`** without polluting or slowing down macOS/Windows bind mounts.
 
@@ -27,7 +27,7 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 | [**pnpm**](src/pnpm/README.md) | `pnpm` | Enables Corepack/pnpm, sets up cross-container `pnpm-store` named volume, configures `store-dir`, exports `PNPM_HOME`, and optional auto-install. |
 | [**Yarn**](src/yarn/README.md) | `yarn` | Enables Corepack/yarn (v1 Classic or Modern Berry), configures persistent `yarn-cache` volume, and optional auto-install. |
 | [**Antigravity**](src/antigravity/README.md) | `antigravity` | Installs Google Antigravity CLI (`agy`), mounts host `~/.gemini`, `~/.agents/skills`, `~/.config/gcloud`, and symlinks global skills. |
-| [**OpenCode**](src/opencode/README.md) | `opencode` | Installs the OpenCode CLI (official binary, arm64/x64, glibc/musl), mounts host `~/.config/opencode` and `~/.local/share/opencode` (provider credentials). |
+| [**OpenCode**](src/opencode/README.md) | `opencode` | Installs the OpenCode CLI (official binary, arm64/x64, glibc/musl), mounts host `~/.config/opencode`, keeps logins and sessions in a shared `opencode-data` volume. |
 | [**Cline**](src/cline/README.md) | `cline` | Installs the Cline CLI (prebuilt binary, arm64/x64, glibc), mounts host `~/.cline/data/settings` (provider credentials, MCP servers). |
 | [**Neovim**](src/neovim/README.md) | `neovim` | Installs official Neovim binary (arm64/x86_64) or compatible release, `ripgrep`, `fd`, `build-essential`, and formatters/linters (`eslint_d`, `prettierd`). |
 | [**Node Modules Volume**](src/node-modules-volume/README.md) | `node-modules-volume` | Isolates `node_modules` into a dedicated Docker named volume for dramatically faster I/O on macOS/Windows. |
@@ -37,7 +37,7 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 Bind mounts are not created on demand: if a host path a feature mounts is missing, the container fails to start. Create them once, or let the project do it before every start:
 
 ```json
-"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.local/share/opencode ~/.cline/data/settings"
+"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.cline/data/settings"
 ```
 
 | Feature | Host paths |
@@ -45,7 +45,7 @@ Bind mounts are not created on demand: if a host path a feature mounts is missin
 | `worktree` | `<workspace>/../.git` |
 | `dotfiles` | `~/dotfiles` |
 | `antigravity` | `~/.gemini`, `~/.agents/skills`, `~/.config/gcloud` |
-| `opencode` | `~/.config/opencode`, `~/.local/share/opencode` |
+| `opencode` | `~/.config/opencode` |
 | `cline` | `~/.cline/data/settings` |
 
 ---
@@ -144,12 +144,12 @@ Pick the features needed for your project:
 ### `opencode`
 - **Mounts**:
   - `${localEnv:HOME}/.config/opencode` -> `/home/node/.config/opencode` (global config, `cli.json`, agents, commands, skills)
-  - `${localEnv:HOME}/.local/share/opencode` -> `/home/node/.local/share/opencode` (provider credentials `opencode.db`, logs, storage)
+  - `opencode-data` volume -> `/home/node/.local/share/opencode` (`opencode.db` with logins and sessions, logs, storage). Shared by all devcontainers, kept across rebuilds, **not** shared with the host: SQLite locking does not work across the host to VM bind mount, and concurrent sessions corrupted the host database (up to 1.1.0).
 - **Options**:
   - `version` (string, default: `"latest"`): OpenCode release to install (e.g. `"2.0.29"`).
 - **CLI**: Official binary is downloaded at build time into `/usr/local/bin` (arm64/x64, glibc/musl, baseline-aware); `postCreate` falls back to the official installer (`https://opencode.ai/v2/install`) when the binary is missing.
 - **Skills**: Combine with the `antigravity` feature to also mount `~/.agents/skills`, which OpenCode discovers natively.
-- **Note**: Avoid running `opencode` on the host and in the container simultaneously — they share the same credential database.
+- **Logins**: run `opencode auth login` once in any container. API keys can be shared with the host through `remoteEnv` (e.g. `"ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"`). Any process in any container can read the logins in the volume, e.g. a malicious `postinstall` in one project can steal the tokens every container uses.
 
 ### `cline`
 - **Mounts**: `${localEnv:HOME}/.cline/data/settings` -> `/home/node/.cline/data/settings` (`providers.json` with provider API keys and the `cline auth` login, `global-settings.json`, `cline_mcp_settings.json`). Read-write and plain text: any process in the container can read your API keys, e.g. a malicious `postinstall` in a project dependency could exfiltrate them and spend on your provider account.

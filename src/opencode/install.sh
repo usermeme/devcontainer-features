@@ -12,7 +12,8 @@ log "Installing OpenCode feature (version: $VERSION)..."
 ensure_download_tools
 
 # OpenCode creates four XDG dirs on startup (packages/util/src/global.ts in the opencode repo):
-# data and config are bind-mounted from the host, state and cache are not. All of them and
+# config is bind-mounted from the host, data is the opencode-data volume (Docker seeds a new
+# volume with this dir's ownership), state and cache are container-local. All of them and
 # their ancestors must belong to the remote user, or OpenCode fails with
 #   Error: EACCES: permission denied, mkdir '/home/node/.local/state'
 resolve_build_owner

@@ -24,6 +24,12 @@ link_from_node_home .agents
 for rel in .config/opencode .local/share/opencode .local/state/opencode .cache/opencode .opencode/bin; do
   ensure_owned_dir "$HOME" "$rel"
 done
+# opencode.db (logins and sessions) lives in the opencode-data volume, not on the host: SQLite
+# locking does not work across the macOS <-> VM bind mount, and concurrent sessions corrupted
+# the host database. ensure_owned_dir skips mounts; the volume is container-only, so claim it.
+# After a UID remap on Linux hosts it keeps the build-time UID until claimed.
+claim_dir "$NODE_HOME/.local/share/opencode"
+drop_world_write "$NODE_HOME/.local/share/opencode"
 warn_unless_writable "$HOME/.config/opencode" "$HOME/.local/share/opencode"
 
 # Install OpenCode CLI if missing (e.g. image was built offline)
