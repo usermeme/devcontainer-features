@@ -1,6 +1,6 @@
 {
   "id": "antigravity",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Antigravity CLI & Host Environment",
   "description": "Installs Antigravity CLI and mounts host credentials, skills (~/.agents/skills), and Google Cloud config for seamless pair-programming inside devcontainer.",
   "options": {

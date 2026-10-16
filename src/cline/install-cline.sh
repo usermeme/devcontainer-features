@@ -9,14 +9,25 @@
 # Exit codes: 0 installed, 1 not installed (offline, unsupported platform), 2 checksum mismatch.
 set -e
 
-FEATURE=cline
-# shellcheck source=../../lib/common.sh
-source "$(dirname "$0")/common.sh"
+log() { echo "[cline] $*"; }
+warn() { echo "[cline] WARNING: $*" >&2; }
+install_packages() {
+  if command -v apt-get &>/dev/null; then
+    apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@" && rm -rf /var/lib/apt/lists/*
+  elif command -v dnf &>/dev/null; then
+    dnf install -y "$@"
+  else
+    return 1
+  fi
+}
 
 VERSION="${1:-latest}"
 PREFIX="/usr/local/lib/cline"
 
-[ "$(id -u)" = "0" ] || die "install-cline.sh must run as root"
+if [ "$(id -u)" != "0" ]; then
+  warn "install-cline.sh must run as root"
+  exit 1
+fi
 
 # The version ends up in a URL: allow dist-tags and semver only.
 if ! [[ "$VERSION" =~ ^[0-9A-Za-z][0-9A-Za-z.+-]*$ ]]; then
@@ -39,7 +50,9 @@ if [ -f /etc/alpine-release ] || (command -v ldd >/dev/null 2>&1 && ldd --versio
   exit 1
 fi
 
-ensure_download_tools
+if ! command -v curl &>/dev/null || ! command -v tar &>/dev/null; then
+  install_packages curl tar ca-certificates || true
+fi
 
 PKG="cli-linux-$CLINE_ARCH"
 TMP_DIR="$(mktemp -d)"
@@ -47,7 +60,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 # Version metadata from the npm registry resolves dist-tags (latest, nightly) and carries the
 # tarball's sha512, so a tampered or truncated download is rejected before it is installed.
-if ! fetch "https://registry.npmjs.org/@cline/$PKG/$VERSION" "$TMP_DIR/meta.json"; then
+if ! curl -fsSL --proto '=https' --tlsv1.2 --retry 3 "https://registry.npmjs.org/@cline/$PKG/$VERSION" -o "$TMP_DIR/meta.json"; then
   warn "could not resolve Cline CLI version '$VERSION' from registry.npmjs.org"
   exit 1
 fi
@@ -59,7 +72,7 @@ if ! [[ "$RESOLVED" =~ ^[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*$ ]]; then
 fi
 
 log "Downloading Cline CLI $RESOLVED ($PKG)..."
-if ! fetch "https://registry.npmjs.org/@cline/$PKG/-/$PKG-$RESOLVED.tgz" "$TMP_DIR/cline.tgz"; then
+if ! curl -fsSL --proto '=https' --tlsv1.2 --retry 3 "https://registry.npmjs.org/@cline/$PKG/-/$PKG-$RESOLVED.tgz" -o "$TMP_DIR/cline.tgz"; then
   warn "Cline CLI download failed"
   exit 1
 fi
@@ -75,7 +88,7 @@ if ! command -v openssl >/dev/null 2>&1; then
 fi
 ACTUAL="sha512-$(openssl dgst -sha512 -binary "$TMP_DIR/cline.tgz" | openssl base64 -A)"
 if [ "$ACTUAL" != "$INTEGRITY" ]; then
-  echo "[$FEATURE] ERROR: checksum mismatch for $PKG-$RESOLVED.tgz (expected $INTEGRITY, got $ACTUAL); not installing it" >&2
+  echo "[cline] ERROR: checksum mismatch for $PKG-$RESOLVED.tgz (expected $INTEGRITY, got $ACTUAL); not installing it" >&2
   exit 2
 fi
 

@@ -1,35 +1,22 @@
 #!/usr/bin/env bash
+# postCreate, as node: install the Antigravity CLI if missing and link the shared skills.
 set -e
 
-FEATURE=antigravity
-# shellcheck source=../../lib/common.sh
-source /usr/local/share/antigravity/common.sh
-load_options
+log() { echo "[antigravity] $*"; }
+warn() { echo "[antigravity] WARNING: $*" >&2; }
 
-SYMLINK_SKILLS="${SYMLINKSKILLS:-true}"
+# shellcheck disable=SC1091
+. /usr/local/share/antigravity/options.env
 
 log "Setting up Antigravity environment..."
 
-resolve_owner
+# ~/.gemini and ~/.config/gcloud are the developer's host directories: never chown them.
+[ ! -e "$HOME/.gemini" ] || [ -w "$HOME/.gemini" ] || warn "$HOME/.gemini is not writable by $(id -un); fix its ownership on the host."
 
-# Non-node users reach the host mounts under /home/node. Linking has to happen before
-# anything below creates these paths, otherwise the host credentials are never visible.
-link_from_node_home .gemini
-link_from_node_home .agents
-link_from_node_home .config/gcloud
-
-# Only the container-side dirs are fixed, non-recursively: ~/.gemini and ~/.config/gcloud are
-# bind mounts of the developer's home, and chown on them rewrites host file ownership.
-for rel in .local/bin .config .gemini; do
-  ensure_owned_dir "$HOME" "$rel"
-done
-warn_unless_writable "$HOME/.gemini"
-
-# Install Antigravity CLI if missing
 if ! command -v agy &>/dev/null && ! command -v antigravity &>/dev/null; then
   log "Installing Antigravity CLI..."
   AGY_INSTALLER="$(mktemp)"
-  if fetch https://antigravity.google/cli/install.sh "$AGY_INSTALLER"; then
+  if curl -fsSL --proto '=https' --tlsv1.2 --retry 3 https://antigravity.google/cli/install.sh -o "$AGY_INSTALLER"; then
     bash "$AGY_INSTALLER" || warn "Antigravity CLI install failed."
   else
     warn "Antigravity CLI install skipped (network unreachable or offline)."
@@ -41,9 +28,9 @@ fi
 # the skills dir both in the container and on the host, instead of a dangling /home/node path.
 # 1.0.0 wrote such an absolute link; it is replaced. Anything else at ~/.gemini/skills is the
 # developer's and is left alone.
-if [ "$SYMLINK_SKILLS" = "true" ]; then
+if [ "$SYMLINKSKILLS" = "true" ]; then
   SKILLS_LINK="$HOME/.gemini/skills"
-  if [ -L "$SKILLS_LINK" ] && [ "$(readlink "$SKILLS_LINK")" = "$NODE_HOME/.agents/skills" ]; then
+  if [ -L "$SKILLS_LINK" ] && [ "$(readlink "$SKILLS_LINK")" = "/home/node/.agents/skills" ]; then
     rm -f "$SKILLS_LINK" || warn "could not replace the absolute link $SKILLS_LINK"
   fi
   if [ -e "$SKILLS_LINK" ] || [ -L "$SKILLS_LINK" ]; then

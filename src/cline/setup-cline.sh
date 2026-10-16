@@ -1,29 +1,20 @@
 #!/usr/bin/env bash
+# postCreate, as node: install the Cline CLI if the build was offline.
 set -e
 
-FEATURE=cline
-# shellcheck source=../../lib/common.sh
-source /usr/local/share/cline/common.sh
-load_options
+log() { echo "[cline] $*"; }
+warn() { echo "[cline] WARNING: $*" >&2; }
+as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo -n "$@"; fi; }
 
-VERSION="${VERSION:-latest}"
+# shellcheck disable=SC1091
+. /usr/local/share/cline/options.env
 
 log "Setting up Cline environment..."
 
-resolve_owner
+# ~/.cline/data/settings is the developer's host directory: never chown it.
+SETTINGS_DIR="$HOME/.cline/data/settings"
+[ ! -e "$SETTINGS_DIR" ] || [ -w "$SETTINGS_DIR" ] || warn "$SETTINGS_DIR is not writable by $(id -un); fix its ownership on the host."
 
-# Non-node users reach the host settings mounted under /home/node.
-# Linking has to happen before anything below creates these paths.
-link_from_node_home .cline/data/settings
-# Shared skills (mounted by the antigravity feature) are discovered natively by Cline
-link_from_node_home .agents
-
-# Repeat the build-time ownership fix with the uid that is actually running. The settings
-# mount itself is skipped: it is the developer's host directory.
-ensure_owned_dir "$HOME" .cline/data/settings
-warn_unless_writable "$HOME/.cline/data/settings"
-
-# Install Cline CLI if missing (e.g. image was built offline)
 if ! command -v cline &>/dev/null; then
   log "Cline CLI not found; installing..."
   as_root bash /usr/local/share/cline/install-cline.sh "$VERSION" ||
