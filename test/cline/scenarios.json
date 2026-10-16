@@ -1,0 +1,17 @@
+{
+  "as-node": {
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+    "remoteUser": "node",
+    "features": {
+      "cline": {}
+    }
+  },
+  "pinned-version": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "cline": {
+        "version": "3.0.72"
+      }
+    }
+  }
+}

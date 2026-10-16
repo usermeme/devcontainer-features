@@ -11,6 +11,7 @@ Team projects often come with a shared `.devcontainer/devcontainer.json`. Howeve
 - You want your **Neovim** editor and developer toolchain (ripgrep, fd, linters) ready on every container.
 - You use **Google Antigravity CLI** (`agy`) and want your global skills (`~/.agents/skills`) and Google Cloud credentials mounted seamlessly.
 - You use **OpenCode** and want your logins, global config, agents, and skills ready in every container without re-running `/connect`.
+- You use **Cline CLI** and want your provider keys, `cline auth` login, and MCP servers available in every container.
 - You want high-speed **Docker volumes for `node_modules`** without polluting or slowing down macOS/Windows bind mounts.
 
 Rather than polluting the team's versioned `devcontainer.json`, you can define a **`.devcontainer/devcontainer.override.json`** in any project, add it to `.gitignore`, and plug in exactly the features you need.
@@ -27,6 +28,7 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 | [**Yarn**](src/yarn/README.md) | `yarn` | Enables Corepack/yarn (v1 Classic or Modern Berry), configures persistent `yarn-cache` volume, and optional auto-install. |
 | [**Antigravity**](src/antigravity/README.md) | `antigravity` | Installs Google Antigravity CLI (`agy`), mounts host `~/.gemini`, `~/.agents/skills`, `~/.config/gcloud`, and symlinks global skills. |
 | [**OpenCode**](src/opencode/README.md) | `opencode` | Installs the OpenCode CLI (official binary, arm64/x64, glibc/musl), mounts host `~/.config/opencode` and `~/.local/share/opencode` (provider credentials). |
+| [**Cline**](src/cline/README.md) | `cline` | Installs the Cline CLI (prebuilt binary, arm64/x64, glibc), mounts host `~/.cline/data/settings` (provider credentials, MCP servers). |
 | [**Neovim**](src/neovim/README.md) | `neovim` | Installs official Neovim binary (arm64/x86_64) or compatible release, `ripgrep`, `fd`, `build-essential`, and formatters/linters (`eslint_d`, `prettierd`). |
 | [**Node Modules Volume**](src/node-modules-volume/README.md) | `node-modules-volume` | Isolates `node_modules` into a dedicated Docker named volume for dramatically faster I/O on macOS/Windows. |
 
@@ -35,7 +37,7 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 Bind mounts are not created on demand: if a host path a feature mounts is missing, the container fails to start. Create them once, or let the project do it before every start:
 
 ```json
-"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.local/share/opencode"
+"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.local/share/opencode ~/.cline/data/settings"
 ```
 
 | Feature | Host paths |
@@ -44,6 +46,7 @@ Bind mounts are not created on demand: if a host path a feature mounts is missin
 | `dotfiles` | `~/dotfiles` |
 | `antigravity` | `~/.gemini`, `~/.agents/skills`, `~/.config/gcloud` |
 | `opencode` | `~/.config/opencode`, `~/.local/share/opencode` |
+| `cline` | `~/.cline/data/settings` |
 
 ---
 
@@ -70,6 +73,7 @@ Pick the features needed for your project:
     "ghcr.io/usermeme/devcontainer-features/pnpm:1": {},
     "ghcr.io/usermeme/devcontainer-features/antigravity:1": {},
     "ghcr.io/usermeme/devcontainer-features/opencode:1": {},
+    "ghcr.io/usermeme/devcontainer-features/cline:1": {},
     "ghcr.io/usermeme/devcontainer-features/neovim:1": {},
     "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {}
   }
@@ -86,6 +90,7 @@ Pick the features needed for your project:
     "ghcr.io/usermeme/devcontainer-features/yarn:1": {},
     "ghcr.io/usermeme/devcontainer-features/antigravity:1": {},
     "ghcr.io/usermeme/devcontainer-features/opencode:1": {},
+    "ghcr.io/usermeme/devcontainer-features/cline:1": {},
     "ghcr.io/usermeme/devcontainer-features/neovim:1": {},
     "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {}
   }
@@ -146,6 +151,14 @@ Pick the features needed for your project:
 - **Skills**: Combine with the `antigravity` feature to also mount `~/.agents/skills`, which OpenCode discovers natively.
 - **Note**: Avoid running `opencode` on the host and in the container simultaneously — they share the same credential database.
 
+### `cline`
+- **Mounts**: `${localEnv:HOME}/.cline/data/settings` -> `/home/node/.cline/data/settings` (`providers.json` with provider API keys and the `cline auth` login, `global-settings.json`, `cline_mcp_settings.json`). Read-write and plain text: any process in the container can read your API keys, e.g. a malicious `postinstall` in a project dependency could exfiltrate them and spend on your provider account.
+- **Not shared**: sessions (SQLite), task history and the hub daemon's PID/port records stay in the container, so history is lost on rebuild. Sharing them breaks both sides: a host PID is meaningless in the container's process namespace, and SQLite locking is unreliable across Docker Desktop / Colima bind mounts.
+- **Options**:
+  - `version` (string, default: `"latest"`): Cline CLI release to install (e.g. `"3.0.72"`).
+- **CLI**: The prebuilt `@cline/cli-linux-<arch>` package is downloaded from the npm registry (no Node required), checked against its registry sha512 (fails closed), and installed root-owned into `/usr/local/lib/cline` behind a shim that passes the system CA bundle (`NODE_EXTRA_CA_CERTS`), as the official npm wrapper does. Self-update is disabled (`CLINE_NO_AUTO_UPDATE=1`); change `version` and rebuild instead. `postCreate` retries the install when the build had no network.
+- **Skills**: Combine with the `antigravity` feature to also mount `~/.agents/skills`, which Cline discovers natively.
+
 ### `neovim`
 - **Tools**: Downloads official Neovim release (arm64 / x86_64), `ripgrep`, `fd-find`, `build-essential`.
 - **Linters**: Installs `eslint_d` and `@fsouza/prettierd` if npm is present.
@@ -175,6 +188,7 @@ devcontainer features test -f dotfiles .
 devcontainer features test -f yarn .
 devcontainer features test -f antigravity .
 devcontainer features test -f opencode .
+devcontainer features test -f cline .
 devcontainer features test --skip-autogenerated -f worktree .
 
 # Note: when Docker runs in a Colima VM, only $HOME is shared with containers.
