@@ -118,7 +118,7 @@ Pick the features needed for your project:
 - **Options**:
   - `packages` (string, default: `""`): Comma-separated list of packages (e.g. `"nvim,tmux,gemini"`). If empty, all directories are stowed.
   - `target` (string, default: `""`): Target directory (defaults to user's `$HOME`).
-- **Build**: Pre-installs GNU Stow into the image. Packages are stowed with `--no-folding`, so only files are linked and tools writing to `~/.config` never write into your dotfiles repository.
+- **Build**: Pre-installs GNU Stow into the image. Packages are stowed with `--no-folding`, so only files are linked and tools writing to `~/.config` never write into your dotfiles repository. Exception: `cline` is stowed with a folded `~/.cline/hooks` directory symlink, because the Cline CLI skips file-level symlinks when discovering hooks. Also appends `~/.local/bin` to the target's `~/.bashrc` PATH so bare-name hook commands resolve.
 
 ### `pnpm`
 - **Mounts**: `source=pnpm-store,target=/home/node/.local/share/pnpm/store,type=volume`

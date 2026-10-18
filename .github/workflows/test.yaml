@@ -82,6 +82,10 @@ jobs:
           # Create mock package in dotfiles for testing
           mkdir -p "$HOME/dotfiles/mockpkg/.config"
           touch "$HOME/dotfiles/mockpkg/.config/mock.conf"
+          # Mock cline package: apply-dotfiles must stow it with a folded hooks directory
+          mkdir -p "$HOME/dotfiles/cline/.cline/hooks"
+          printf '#!/usr/bin/env bash\necho "{}"\n' > "$HOME/dotfiles/cline/.cline/hooks/PostToolUse"
+          chmod +x "$HOME/dotfiles/cline/.cline/hooks/PostToolUse"
 
       - name: "Test ${{ matrix.feature }}"
         run: devcontainer features test --project-folder . ${{ matrix.args }} -f ${{ matrix.feature }}
