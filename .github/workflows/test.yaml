@@ -64,6 +64,7 @@ jobs:
           - feature: antigravity
           - feature: opencode
           - feature: cline
+          - feature: kilocode
           - feature: neovim
           - feature: node-modules-volume
     name: test (${{ matrix.feature }})
@@ -79,6 +80,7 @@ jobs:
           mkdir -p "$HOME/dotfiles" "$HOME/.gemini" "$HOME/.agents/skills" "$HOME/.config/gcloud"
           mkdir -p "$HOME/.config/opencode"
           mkdir -p "$HOME/.cline/data/settings"
+          mkdir -p "$HOME/.config/kilo"
           # Create mock package in dotfiles for testing
           mkdir -p "$HOME/dotfiles/mockpkg/.config"
           touch "$HOME/dotfiles/mockpkg/.config/mock.conf"

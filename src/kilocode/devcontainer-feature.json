@@ -1,0 +1,29 @@
+{
+  "id": "kilocode",
+  "version": "1.0.0",
+  "name": "Kilo Code CLI & Host Environment",
+  "description": "Installs the Kilo Code CLI (kilo), mounts host config (~/.config/kilo) and keeps logins and sessions (~/.local/share/kilo) in a volume shared by all devcontainers.",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Kilo Code CLI version to install (e.g. 'latest' or a specific release like '7.8.17')"
+    }
+  },
+  "containerEnv": {
+    "KILO_DISABLE_AUTOUPDATE": "1"
+  },
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/.config/kilo",
+      "target": "/home/node/.config/kilo",
+      "type": "bind"
+    },
+    {
+      "source": "kilocode-data",
+      "target": "/home/node/.local/share/kilo",
+      "type": "volume"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/kilocode/setup-kilocode.sh"
+}

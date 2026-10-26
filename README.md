@@ -12,6 +12,7 @@ Team projects often come with a shared `.devcontainer/devcontainer.json`. Howeve
 - You use **Google Antigravity CLI** (`agy`) and want your global skills (`~/.agents/skills`) and Google Cloud credentials mounted seamlessly.
 - You use **OpenCode** and want your global config, agents, and skills in every container, and to log in once for all containers.
 - You use **Cline CLI** and want your provider keys, `cline auth` login, and MCP servers available in every container.
+- You use **Kilo Code CLI** (`kilo`) and want your global config, login, and sessions available in every container.
 - You want high-speed **Docker volumes for `node_modules`** without polluting or slowing down macOS/Windows bind mounts.
 
 Rather than polluting the team's versioned `devcontainer.json`, you can define a **`.devcontainer/devcontainer.override.json`** in any project, add it to `.gitignore`, and plug in exactly the features you need.
@@ -29,19 +30,20 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 | [**Antigravity**](src/antigravity/README.md) | `antigravity` | Installs Google Antigravity CLI (`agy`), mounts host `~/.gemini`, `~/.agents/skills`, `~/.config/gcloud`, and symlinks global skills. |
 | [**OpenCode**](src/opencode/README.md) | `opencode` | Installs the OpenCode CLI (official binary, arm64/x64, glibc/musl), mounts host `~/.config/opencode`, keeps logins and sessions in a shared `opencode-data` volume. |
 | [**Cline**](src/cline/README.md) | `cline` | Installs the Cline CLI (prebuilt binary, arm64/x64, glibc), mounts host `~/.cline/data/settings` (provider credentials, MCP servers). |
+| [**Kilo Code**](src/kilocode/README.md) | `kilocode` | Installs the Kilo Code CLI (prebuilt binary, arm64/x64, glibc/musl, baseline-aware), mounts host `~/.config/kilo`, keeps logins and sessions in a shared `kilocode-data` volume. |
 | [**Neovim**](src/neovim/README.md) | `neovim` | Installs official Neovim binary (arm64/x86_64) or compatible release, `ripgrep`, `fd`, `build-essential`, and formatters/linters (`eslint_d`, `prettierd`). |
 | [**Node Modules Volume**](src/node-modules-volume/README.md) | `node-modules-volume` | Isolates `node_modules` into a dedicated Docker named volume for dramatically faster I/O on macOS/Windows. |
 
 ### Remote user
 
-`antigravity`, `opencode`, `cline`, `pnpm` and `yarn` mount into `/home/node` (a feature's mounts cannot reference the remote user), so they support `"remoteUser": "node"` only, as in the `mcr.microsoft.com/devcontainers/typescript-node` and `javascript-node` images. Under another user (e.g. `vscode`) the build prints a warning and the mounted config is not visible in that user's home. `worktree`, `dotfiles`, `neovim` and `node-modules-volume` work with any user.
+`antigravity`, `opencode`, `cline`, `kilocode`, `pnpm` and `yarn` mount into `/home/node` (a feature's mounts cannot reference the remote user), so they support `"remoteUser": "node"` only, as in the `mcr.microsoft.com/devcontainers/typescript-node` and `javascript-node` images. Under another user (e.g. `vscode`) the build prints a warning and the mounted config is not visible in that user's home. `worktree`, `dotfiles`, `neovim` and `node-modules-volume` work with any user.
 
 ### Host paths must exist
 
 Bind mounts are not created on demand: if a host path a feature mounts is missing, the container fails to start. Create them once, or let the project do it before every start:
 
 ```json
-"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.cline/data/settings"
+"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.config/kilo ~/.cline/data/settings"
 ```
 
 | Feature | Host paths |
@@ -51,6 +53,7 @@ Bind mounts are not created on demand: if a host path a feature mounts is missin
 | `antigravity` | `~/.gemini`, `~/.agents/skills`, `~/.config/gcloud` |
 | `opencode` | `~/.config/opencode` |
 | `cline` | `~/.cline/data/settings` |
+| `kilocode` | `~/.config/kilo` |
 
 ---
 
@@ -78,6 +81,7 @@ Pick the features needed for your project:
     "ghcr.io/usermeme/devcontainer-features/antigravity:1": {},
     "ghcr.io/usermeme/devcontainer-features/opencode:1": {},
     "ghcr.io/usermeme/devcontainer-features/cline:1": {},
+    "ghcr.io/usermeme/devcontainer-features/kilocode:1": {},
     "ghcr.io/usermeme/devcontainer-features/neovim:1": {},
     "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {}
   }
@@ -95,6 +99,7 @@ Pick the features needed for your project:
     "ghcr.io/usermeme/devcontainer-features/antigravity:1": {},
     "ghcr.io/usermeme/devcontainer-features/opencode:1": {},
     "ghcr.io/usermeme/devcontainer-features/cline:1": {},
+    "ghcr.io/usermeme/devcontainer-features/kilocode:1": {},
     "ghcr.io/usermeme/devcontainer-features/neovim:1": {},
     "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {}
   }
@@ -163,6 +168,15 @@ Pick the features needed for your project:
 - **CLI**: The prebuilt `@cline/cli-linux-<arch>` package is downloaded from the npm registry (no Node required), checked against its registry sha512 (fails closed), and installed root-owned into `/usr/local/lib/cline` behind a shim that passes the system CA bundle (`NODE_EXTRA_CA_CERTS`), as the official npm wrapper does. Self-update is disabled (`CLINE_NO_AUTO_UPDATE=1`); change `version` and rebuild instead. `postCreate` retries the install when the build had no network.
 - **Skills**: Combine with the `antigravity` feature to also mount `~/.agents/skills`, which Cline discovers natively.
 
+### `kilocode`
+- **Mounts**:
+  - `${localEnv:HOME}/.config/kilo` -> `/home/node/.config/kilo` (global config: `config.json`, provider defaults, MCP servers). Read-write and plain text: config values can contain secrets.
+  - `kilocode-data` volume -> `/home/node/.local/share/kilo` (`auth.json` with the `/connect` login and provider keys, sessions, logs, repos). Shared by all devcontainers, kept across rebuilds, **not** shared with the host: SQLite-style state is not safe on a bind mount across the host to VM boundary, and concurrent writers corrupt it.
+- **Options**:
+  - `version` (string, default: `"latest"`): Kilo Code CLI release to install (e.g. `"7.8.17"`).
+- **CLI**: The prebuilt `@kilocode/cli-linux-<arch>` package (arm64/x64, glibc/musl, `-baseline` for x64 CPUs without AVX2) is downloaded from the npm registry (no Node required), checked against its registry sha512 (fails closed), and installed root-owned into `/usr/local/lib/kilocode` behind a shim that passes the system CA bundle (`NODE_EXTRA_CA_CERTS`) and the bundled tree-sitter WASM dir (`KILO_TREE_SITTER_WASM_DIR`), as the official npm wrapper does. Self-update is disabled (`KILO_DISABLE_AUTOUPDATE=1`); change `version` and rebuild instead. `postCreate` retries the install when the build had no network. Both `kilo` and `kilocode` commands are available.
+- **Logins**: run `kilo` and use `/connect` once in any container; the login lands in the shared volume. Your host keeps its own, separate login. Any process in any container can read the tokens in the volume, e.g. a malicious `postinstall` in one project can steal them.
+
 ### `neovim`
 - **Tools**: Downloads official Neovim release (arm64 / x86_64), `ripgrep`, `fd-find`, `build-essential`.
 - **Linters**: Installs `eslint_d` and `@fsouza/prettierd` if npm is present.
@@ -193,6 +207,7 @@ devcontainer features test -f yarn .
 devcontainer features test -f antigravity .
 devcontainer features test -f opencode .
 devcontainer features test -f cline .
+devcontainer features test -f kilocode .
 devcontainer features test --skip-autogenerated -f worktree .
 
 # Note: when Docker runs in a Colima VM, only $HOME is shared with containers.

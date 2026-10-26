@@ -1,0 +1,17 @@
+{
+  "as-node": {
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+    "remoteUser": "node",
+    "features": {
+      "kilocode": {}
+    }
+  },
+  "pinned-version": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "kilocode": {
+        "version": "7.8.17"
+      }
+    }
+  }
+}
