@@ -1,0 +1,10 @@
+{
+  "ssh-protocol": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "github": {
+        "gitProtocol": "ssh"
+      }
+    }
+  }
+}

@@ -67,6 +67,7 @@ jobs:
           - feature: kilocode
           - feature: neovim
           - feature: node-modules-volume
+          - feature: github
     name: test (${{ matrix.feature }})
     steps:
       - uses: actions/checkout@v7

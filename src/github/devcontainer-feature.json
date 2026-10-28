@@ -1,0 +1,27 @@
+{
+  "id": "github",
+  "version": "1.0.0",
+  "name": "GitHub CLI & Restricted Token Auth",
+  "description": "Installs GitHub CLI (gh) if not present, forwards the host's DEVCONTAINER_GITHUB_TOKEN into GH_TOKEN and GITHUB_TOKEN inside the container, and configures Git to authenticate over HTTPS using that token.",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "GitHub CLI (gh) version to install when gh is not already present (e.g. 'latest' or '2.67.0')"
+    },
+    "gitProtocol": {
+      "type": "string",
+      "enum": [
+        "https",
+        "ssh"
+      ],
+      "default": "https",
+      "description": "When 'https', rewrites git@github.com: and ssh://git@github.com/ remotes to https://github.com/ in system Git config so git push/pull uses the restricted token instead of forwarded host SSH keys"
+    }
+  },
+  "remoteEnv": {
+    "DEVCONTAINER_GITHUB_TOKEN": "${localEnv:DEVCONTAINER_GITHUB_TOKEN}",
+    "GH_TOKEN": "${localEnv:DEVCONTAINER_GITHUB_TOKEN}",
+    "GITHUB_TOKEN": "${localEnv:DEVCONTAINER_GITHUB_TOKEN}"
+  }
+}

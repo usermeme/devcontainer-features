@@ -14,6 +14,7 @@ Team projects often come with a shared `.devcontainer/devcontainer.json`. Howeve
 - You use **Cline CLI** and want your provider keys, `cline auth` login, and MCP servers available in every container.
 - You use **Kilo Code CLI** (`kilo`) and want your global config, login, and sessions available in every container.
 - You want high-speed **Docker volumes for `node_modules`** without polluting or slowing down macOS/Windows bind mounts.
+- You want a **restricted GitHub token** (`DEVCONTAINER_GITHUB_TOKEN`) passed into the container for committing, pushing, and opening PRs with `gh` without exposing your full-access host credentials.
 
 Rather than polluting the team's versioned `devcontainer.json`, you can define a **`.devcontainer/devcontainer.override.json`** in any project, add it to `.gitignore`, and plug in exactly the features you need.
 
@@ -33,10 +34,11 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 | [**Kilo Code**](src/kilocode/README.md) | `kilocode` | Installs the Kilo Code CLI (prebuilt binary, arm64/x64, glibc/musl, baseline-aware), mounts host `~/.config/kilo`, keeps logins and sessions in a shared `kilocode-data` volume. |
 | [**Neovim**](src/neovim/README.md) | `neovim` | Installs official Neovim binary (arm64/x86_64) or compatible release, `ripgrep`, `fd`, `build-essential`, and formatters/linters (`eslint_d`, `prettierd`). |
 | [**Node Modules Volume**](src/node-modules-volume/README.md) | `node-modules-volume` | Isolates `node_modules` into a dedicated Docker named volume for dramatically faster I/O on macOS/Windows. |
+| [**GitHub CLI & Restricted Token Auth**](src/github/README.md) | `github` | Installs GitHub CLI (`gh`) if not present, forwards host `DEVCONTAINER_GITHUB_TOKEN` into `GH_TOKEN`/`GITHUB_TOKEN`, and configures Git HTTPS auth to use that token. |
 
 ### Remote user
 
-`antigravity`, `opencode`, `cline`, `kilocode`, `pnpm` and `yarn` mount into `/home/node` (a feature's mounts cannot reference the remote user), so they support `"remoteUser": "node"` only, as in the `mcr.microsoft.com/devcontainers/typescript-node` and `javascript-node` images. Under another user (e.g. `vscode`) the build prints a warning and the mounted config is not visible in that user's home. `worktree`, `dotfiles`, `neovim` and `node-modules-volume` work with any user.
+`antigravity`, `opencode`, `cline`, `kilocode`, `pnpm` and `yarn` mount into `/home/node` (a feature's mounts cannot reference the remote user), so they support `"remoteUser": "node"` only, as in the `mcr.microsoft.com/devcontainers/typescript-node` and `javascript-node` images. Under another user (e.g. `vscode`) the build prints a warning and the mounted config is not visible in that user's home. `worktree`, `dotfiles`, `neovim`, `node-modules-volume` and `github` work with any user.
 
 ### Host paths must exist
 
@@ -83,7 +85,8 @@ Pick the features needed for your project:
     "ghcr.io/usermeme/devcontainer-features/cline:1": {},
     "ghcr.io/usermeme/devcontainer-features/kilocode:1": {},
     "ghcr.io/usermeme/devcontainer-features/neovim:1": {},
-    "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {}
+    "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {},
+    "ghcr.io/usermeme/devcontainer-features/github:1": {}
   }
 }
 ```
@@ -101,7 +104,8 @@ Pick the features needed for your project:
     "ghcr.io/usermeme/devcontainer-features/cline:1": {},
     "ghcr.io/usermeme/devcontainer-features/kilocode:1": {},
     "ghcr.io/usermeme/devcontainer-features/neovim:1": {},
-    "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {}
+    "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {},
+    "ghcr.io/usermeme/devcontainer-features/github:1": {}
   }
 }
 ```
@@ -188,6 +192,14 @@ Pick the features needed for your project:
 ### `node-modules-volume`
 - **Mounts**: `source=${devcontainerId}-node_modules,target=/workspaces/${localWorkspaceFolderBasename}/node_modules,type=volume` (one volume per dev container, so same-named folders no longer share `node_modules`)
 - Prevents cross-OS filesystem sync performance degradation on macOS and Windows by keeping `node_modules` inside Docker storage.
+
+### `github`
+- **Environment (`remoteEnv`)**: Maps host `${localEnv:DEVCONTAINER_GITHUB_TOKEN}` to `GH_TOKEN`, `GITHUB_TOKEN`, and `DEVCONTAINER_GITHUB_TOKEN` inside the container (not baked into container layers).
+- **CLI**: Installs the official GitHub CLI (`gh`) binary (verified against `gh_<version>_checksums.txt`) when not already installed.
+- **Git Authentication**: Configures system Git (`/etc/gitconfig`) to use `gh auth git-credential` for `https://github.com` and `https://gist.github.com`, and rewrites `git@github.com:` / `ssh://git@github.com/` remotes to `https://github.com/` inside the container so `git push` and `gh pr create` strictly use the restricted token instead of forwarded host SSH keys.
+- **Options**:
+  - `version` (string, default: `"latest"`): GitHub CLI version to install if `gh` is not already present.
+  - `gitProtocol` (string, default: `"https"`): Set to `"https"` to rewrite SSH GitHub remotes to HTTPS in system Git config, or `"ssh"` to leave SSH remotes untouched.
 
 ---
 
