@@ -200,6 +200,7 @@ Pick the features needed for your project:
 - **Options**:
   - `version` (string, default: `"latest"`): GitHub CLI version to install if `gh` is not already present.
   - `gitProtocol` (string, default: `"https"`): Set to `"https"` to rewrite SSH GitHub remotes to HTTPS in system Git config, or `"ssh"` to leave SSH remotes untouched.
+- **Organization setup**: a token is always owned by a user, so either every developer generates a fine-grained token whose **resource owner** is the organization (an owner may have to approve it under *Personal access tokens → Pending requests*), or an organization owner stores one `DEVCONTAINER_GITHUB_TOKEN` Codespaces secret for all repositories. See [`src/github/NOTES.md`](src/github/NOTES.md#organization-setup).
 
 ---
 
