@@ -68,6 +68,7 @@ jobs:
           - feature: neovim
           - feature: node-modules-volume
           - feature: github
+          - feature: penpot
     name: test (${{ matrix.feature }})
     steps:
       - uses: actions/checkout@v7
@@ -82,6 +83,7 @@ jobs:
           mkdir -p "$HOME/.config/opencode"
           mkdir -p "$HOME/.cline/data/settings"
           mkdir -p "$HOME/.config/kilo"
+          mkdir -p "$HOME/.penpot-ai-kit"
           # Create mock package in dotfiles for testing
           mkdir -p "$HOME/dotfiles/mockpkg/.config"
           touch "$HOME/dotfiles/mockpkg/.config/mock.conf"

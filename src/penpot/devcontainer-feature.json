@@ -1,0 +1,21 @@
+{
+  "id": "penpot",
+  "version": "1.0.0",
+  "name": "Penpot Kit & Host Environment",
+  "description": "Mounts host Penpot AI Kit directory (~/.penpot-ai-kit) and configures Penpot AI Kit inside devcontainer.",
+  "options": {
+    "symlinkPenpot": {
+      "type": "boolean",
+      "default": true,
+      "description": "Symlink /home/node/.penpot to /home/node/.penpot-ai-kit inside the container"
+    }
+  },
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/.penpot-ai-kit",
+      "target": "/home/node/.penpot-ai-kit",
+      "type": "bind"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/penpot/setup-penpot.sh"
+}

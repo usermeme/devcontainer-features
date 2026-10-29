@@ -15,6 +15,7 @@ Team projects often come with a shared `.devcontainer/devcontainer.json`. Howeve
 - You use **Kilo Code CLI** (`kilo`) and want your global config, login, and sessions available in every container.
 - You want high-speed **Docker volumes for `node_modules`** without polluting or slowing down macOS/Windows bind mounts.
 - You want a **restricted GitHub token** (`DEVCONTAINER_GITHUB_TOKEN`) passed into the container for committing, pushing, and opening PRs with `gh` without exposing your full-access host credentials.
+- You use **Penpot AI Kit** and want your host Penpot environment (`~/.penpot-ai-kit`) mounted into your devcontainer.
 
 Rather than polluting the team's versioned `devcontainer.json`, you can define a **`.devcontainer/devcontainer.override.json`** in any project, add it to `.gitignore`, and plug in exactly the features you need.
 
@@ -35,17 +36,18 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 | [**Neovim**](src/neovim/README.md) | `neovim` | Installs official Neovim binary (arm64/x86_64) or compatible release, `ripgrep`, `fd`, `build-essential`, and formatters/linters (`eslint_d`, `prettierd`). |
 | [**Node Modules Volume**](src/node-modules-volume/README.md) | `node-modules-volume` | Isolates `node_modules` into a dedicated Docker named volume for dramatically faster I/O on macOS/Windows. |
 | [**GitHub CLI & Restricted Token Auth**](src/github/README.md) | `github` | Installs GitHub CLI (`gh`) if not present, forwards host `DEVCONTAINER_GITHUB_TOKEN` into `GH_TOKEN`/`GITHUB_TOKEN`, and configures Git HTTPS auth to use that token. |
+| [**Penpot**](src/penpot/README.md) | `penpot` | Mounts host `~/.penpot-ai-kit` directly into `/home/node/.penpot-ai-kit` inside devcontainer. |
 
 ### Remote user
 
-`antigravity`, `opencode`, `cline`, `kilocode`, `pnpm` and `yarn` mount into `/home/node` (a feature's mounts cannot reference the remote user), so they support `"remoteUser": "node"` only, as in the `mcr.microsoft.com/devcontainers/typescript-node` and `javascript-node` images. Under another user (e.g. `vscode`) the build prints a warning and the mounted config is not visible in that user's home. `worktree`, `dotfiles`, `neovim`, `node-modules-volume` and `github` work with any user.
+`antigravity`, `opencode`, `cline`, `kilocode`, `penpot`, `pnpm` and `yarn` mount into `/home/node` (a feature's mounts cannot reference the remote user), so they support `"remoteUser": "node"` only, as in the `mcr.microsoft.com/devcontainers/typescript-node` and `javascript-node` images. Under another user (e.g. `vscode`) the build prints a warning and the mounted config is not visible in that user's home. `worktree`, `dotfiles`, `neovim`, `node-modules-volume` and `github` work with any user.
 
 ### Host paths must exist
 
 Bind mounts are not created on demand: if a host path a feature mounts is missing, the container fails to start. Create them once, or let the project do it before every start:
 
 ```json
-"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.config/kilo ~/.cline/data/settings"
+"initializeCommand": "mkdir -p ~/dotfiles ~/.gemini ~/.agents/skills ~/.config/gcloud ~/.config/opencode ~/.config/kilo ~/.cline/data/settings ~/.penpot-ai-kit"
 ```
 
 | Feature | Host paths |
@@ -56,6 +58,7 @@ Bind mounts are not created on demand: if a host path a feature mounts is missin
 | `opencode` | `~/.config/opencode` |
 | `cline` | `~/.cline/data/settings` |
 | `kilocode` | `~/.config/kilo` |
+| `penpot` | `~/.penpot-ai-kit` |
 
 ---
 
@@ -202,6 +205,13 @@ Pick the features needed for your project:
   - `gitProtocol` (string, default: `"https"`): Set to `"https"` to rewrite SSH GitHub remotes to HTTPS in system Git config, or `"ssh"` to leave SSH remotes untouched.
 - **Organization setup**: a token is always owned by a user, so either every developer generates a fine-grained token whose **resource owner** is the organization (an owner may have to approve it under *Personal access tokens → Pending requests*), or an organization owner stores one `DEVCONTAINER_GITHUB_TOKEN` Codespaces secret for all repositories. See [`src/github/NOTES.md`](src/github/NOTES.md#organization-setup).
 
+### `penpot`
+- **Mounts**:
+  - `${localEnv:HOME}/.penpot-ai-kit` -> `/home/node/.penpot-ai-kit` (host Penpot kit seed, design templates, policies, skills)
+- **Options**:
+  - `symlinkPenpot` (boolean, default: `true`): Symlinks `/home/node/.penpot` to `.penpot-ai-kit` inside the container if `/home/node/.penpot` does not already exist, ensuring compatibility with tools expecting either path.
+- **MCP Configuration**: Allows manual endpoint configuration (`mode=none`) across agents (OpenCode, Cursor, Claude, Antigravity) without hardcoding credentials in the image or container layers.
+
 ---
 
 ## Local Development & Testing
@@ -221,6 +231,7 @@ devcontainer features test -f antigravity .
 devcontainer features test -f opencode .
 devcontainer features test -f cline .
 devcontainer features test -f kilocode .
+devcontainer features test -f penpot .
 devcontainer features test --skip-autogenerated -f worktree .
 
 # Note: when Docker runs in a Colima VM, only $HOME is shared with containers.
