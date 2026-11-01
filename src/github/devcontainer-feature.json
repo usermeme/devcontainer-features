@@ -19,7 +19,7 @@
       "description": "When 'https', rewrites git@github.com: and ssh://git@github.com/ remotes to https://github.com/ in system Git config so git push/pull uses the restricted token instead of forwarded host SSH keys"
     }
   },
-  "remoteEnv": {
+  "containerEnv": {
     "DEVCONTAINER_GITHUB_TOKEN": "${localEnv:DEVCONTAINER_GITHUB_TOKEN}",
     "GH_TOKEN": "${localEnv:DEVCONTAINER_GITHUB_TOKEN}",
     "GITHUB_TOKEN": "${localEnv:DEVCONTAINER_GITHUB_TOKEN}"
