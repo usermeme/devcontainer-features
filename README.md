@@ -35,7 +35,7 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 | [**Kilo Code**](src/kilocode/README.md) | `kilocode` | Installs the Kilo Code CLI (prebuilt binary, arm64/x64, glibc/musl, baseline-aware), mounts host `~/.config/kilo`, keeps logins and sessions in a shared `kilocode-data` volume. |
 | [**Neovim**](src/neovim/README.md) | `neovim` | Installs official Neovim binary (arm64/x86_64) or compatible release, `ripgrep`, `fd`, `build-essential`, and formatters/linters (`eslint_d`, `prettierd`). |
 | [**Node Modules Volume**](src/node-modules-volume/README.md) | `node-modules-volume` | Isolates `node_modules` into a dedicated Docker named volume for dramatically faster I/O on macOS/Windows. |
-| [**GitHub CLI & Restricted Token Auth**](src/github/README.md) | `github` | Installs GitHub CLI (`gh`) if not present, forwards host `DEVCONTAINER_GITHUB_TOKEN` into `GH_TOKEN`/`GITHUB_TOKEN`, and configures Git HTTPS auth to use that token. |
+| [**GitHub CLI & Restricted Token Auth**](src/github/README.md) | `github` | Installs GitHub CLI (`gh`) if not present and configures Git HTTPS auth using `gh` credential helper with forwarded host tokens. |
 | [**Penpot**](src/penpot/README.md) | `penpot` | Mounts host `~/.penpot-ai-kit` directly into `/home/node/.penpot-ai-kit` inside devcontainer. |
 
 ### Remote user
@@ -197,7 +197,7 @@ Pick the features needed for your project:
 - Prevents cross-OS filesystem sync performance degradation on macOS and Windows by keeping `node_modules` inside Docker storage.
 
 ### `github`
-- **Environment (`remoteEnv`)**: Maps host `${localEnv:DEVCONTAINER_GITHUB_TOKEN}` to `GH_TOKEN`, `GITHUB_TOKEN`, and `DEVCONTAINER_GITHUB_TOKEN` inside the container (not baked into container layers).
+- **Environment (`remoteEnv`)**: Forward host `${localEnv:DEVCONTAINER_GITHUB_TOKEN}` via `remoteEnv` in `devcontainer.json` to `GH_TOKEN`, `GITHUB_TOKEN`, and `DEVCONTAINER_GITHUB_TOKEN` inside the container (not baked into container layers).
 - **CLI**: Installs the official GitHub CLI (`gh`) binary (verified against `gh_<version>_checksums.txt`) when not already installed.
 - **Git Authentication**: Configures system Git (`/etc/gitconfig`) to use `gh auth git-credential` for `https://github.com` and `https://gist.github.com`, and rewrites `git@github.com:` / `ssh://git@github.com/` remotes to `https://github.com/` inside the container so `git push` and `gh pr create` strictly use the restricted token instead of forwarded host SSH keys.
 - **Options**:
