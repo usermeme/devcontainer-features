@@ -16,6 +16,7 @@
     "test:node-modules-volume": "devcontainer features test --project-folder . -f node-modules-volume",
     "test:github": "devcontainer features test --project-folder . -f github",
     "test:penpot": "devcontainer features test --project-folder . -f penpot",
+    "test:hermes": "devcontainer features test --project-folder . -f hermes",
     "generate-docs": "devcontainer features generate-docs --project-folder src --registry ghcr.io --namespace usermeme/devcontainer-features"
   },
   "keywords": [

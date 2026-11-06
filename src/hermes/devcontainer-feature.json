@@ -1,0 +1,25 @@
+{
+  "id": "hermes",
+  "version": "1.0.0",
+  "name": "Hermes Agent CLI & Host Environment",
+  "description": "Installs the Hermes Agent CLI (hermes) by Nous Research and mounts host configuration, API keys, skills, and memories (~/.hermes) for autonomous AI workflows inside devcontainer.",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Hermes Agent version or channel to install ('latest', 'stable', 'main', or a git commit/branch)"
+    }
+  },
+  "containerEnv": {
+    "HERMES_HOME": "/home/node/.hermes",
+    "PATH": "/home/node/.local/bin:${PATH}"
+  },
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/.hermes",
+      "target": "/home/node/.hermes",
+      "type": "bind"
+    }
+  ],
+  "postCreateCommand": "/usr/local/share/hermes/setup-hermes.sh"
+}
