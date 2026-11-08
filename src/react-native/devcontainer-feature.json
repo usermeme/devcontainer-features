@@ -1,0 +1,29 @@
+{
+  "id": "react-native",
+  "version": "1.0.0",
+  "name": "React Native & Host Mobile Simulator Bridge",
+  "description": "Installs Watchman, ADB, Meta's IDB client, and a unified agent simulator CLI (sim) to let devcontainer agents control host iOS Simulators and Android Emulators.",
+  "options": {
+    "idbPort": {
+      "type": "string",
+      "default": "10882",
+      "description": "Port where idb_companion is running on the macOS host"
+    },
+    "adbPort": {
+      "type": "string",
+      "default": "5037",
+      "description": "Port where ADB server is running on the host"
+    },
+    "installWatchman": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install Facebook Watchman if available in package manager"
+    }
+  },
+  "containerEnv": {
+    "IDB_COMPANION": "host.docker.internal:10882",
+    "ADB_SERVER_SOCKET": "tcp:host.docker.internal:5037",
+    "REACT_NATIVE_PACKAGER_HOSTNAME": "host.docker.internal"
+  },
+  "postCreateCommand": "/usr/local/share/react-native/setup-react-native.sh"
+}

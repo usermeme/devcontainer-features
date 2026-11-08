@@ -17,6 +17,7 @@ Team projects often come with a shared `.devcontainer/devcontainer.json`. Howeve
 - You want a **restricted GitHub token** (`DEVCONTAINER_GITHUB_TOKEN`) passed into the container for committing, pushing, and opening PRs with `gh` without exposing your full-access host credentials.
 - You use **Penpot AI Kit** and want your host Penpot environment (`~/.penpot-ai-kit`) mounted into your devcontainer.
 - You use **Hermes Agent** (`hermes`) and want your global configuration, API keys, skills, and memories (`~/.hermes`) ready in every container.
+- You develop **React Native / mobile apps** and want your AI agent to view, inspect, and control the iOS Simulator and Android Emulator running on your host machine.
 
 Rather than polluting the team's versioned `devcontainer.json`, you can define a **`.devcontainer/devcontainer.override.json`** in any project, add it to `.gitignore`, and plug in exactly the features you need.
 
@@ -39,6 +40,7 @@ Rather than polluting the team's versioned `devcontainer.json`, you can define a
 | [**GitHub CLI & Restricted Token Auth**](src/github/README.md) | `github` | Installs GitHub CLI (`gh`) if not present and configures Git HTTPS auth using `gh` credential helper with forwarded host tokens. |
 | [**Penpot**](src/penpot/README.md) | `penpot` | Mounts host `~/.penpot-ai-kit` directly into `/home/node/.penpot-ai-kit` inside devcontainer. |
 | [**Hermes Agent**](src/hermes/README.md) | `hermes` | Installs Hermes Agent CLI (`hermes`) by Nous Research, mounts host `~/.hermes` (config, API keys, skills, memories). |
+| [**React Native**](src/react-native/README.md) | `react-native` | Installs Watchman, ADB, Meta's IDB client, and `sim` CLI to control host iOS Simulators and Android Emulators. |
 
 ### Remote user
 
@@ -93,7 +95,8 @@ Pick the features needed for your project:
     "ghcr.io/usermeme/devcontainer-features/neovim:1": {},
     "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {},
     "ghcr.io/usermeme/devcontainer-features/github:1": {},
-    "ghcr.io/usermeme/devcontainer-features/hermes:1": {}
+    "ghcr.io/usermeme/devcontainer-features/hermes:1": {},
+    "ghcr.io/usermeme/devcontainer-features/react-native:1": {}
   }
 }
 ```
@@ -113,7 +116,8 @@ Pick the features needed for your project:
     "ghcr.io/usermeme/devcontainer-features/neovim:1": {},
     "ghcr.io/usermeme/devcontainer-features/node-modules-volume:1": {},
     "ghcr.io/usermeme/devcontainer-features/github:1": {},
-    "ghcr.io/usermeme/devcontainer-features/hermes:1": {}
+    "ghcr.io/usermeme/devcontainer-features/hermes:1": {},
+    "ghcr.io/usermeme/devcontainer-features/react-native:1": {}
   }
 }
 ```
