@@ -1,0 +1,317 @@
+#!/usr/bin/env bash
+# sim: Unified mobile simulator/emulator CLI for AI agents and developers.
+# Controls host iOS Simulators (via idb) and Android Emulators (via adb).
+set -e
+
+IDB_PORT="${IDB_PORT:-${IDBPORT:-10882}}"
+ADB_PORT="${ADB_PORT:-${ADBPORT:-5037}}"
+IDB_COMPANION="${IDB_COMPANION:-host.docker.internal:$IDB_PORT}"
+ADB_SERVER_SOCKET="${ADB_SERVER_SOCKET:-tcp:host.docker.internal:$ADB_PORT}"
+export IDB_COMPANION ADB_SERVER_SOCKET
+
+show_help() {
+  cat <<'EOF'
+sim - Mobile Simulator / Emulator CLI for AI agents and developers
+
+Usage:
+  sim devices                          List connected iOS Simulators & Android Emulators
+  sim bridge-status                    Check connection to host simulator daemons
+  sim screenshot [output.png]          Capture screen of the active simulator/emulator
+  sim ui [--json]                      Dump accessibility element hierarchy with coordinates
+  sim tap <x> <y>                      Tap at (x, y) coordinates
+  sim text "<string>"                  Type text into the focused field
+  sim key <key_code_or_name>           Press key/hardware button (e.g. HOME, BACK, ENTER)
+  sim swipe <x1> <y1> <x2> <y2> [ms]   Perform swipe gesture between coordinates
+  sim launch <app_id>                  Launch app by bundle ID (iOS) or package name (Android)
+  sim install <app_path>               Install .app (iOS) or .apk (Android)
+
+Target Flags (optional, auto-detected by default):
+  --ios                                Target host iOS Simulator via idb
+  --android                            Target host Android Emulator/device via adb
+
+Examples:
+  sim devices
+  sim screenshot screen.png
+  sim ui
+  sim tap 200 450
+  sim text "user@example.com"
+  sim key HOME
+EOF
+}
+
+TARGET=""
+if [ "$1" = "--ios" ]; then
+  TARGET="ios"
+  shift
+elif [ "$1" = "--android" ]; then
+  TARGET="android"
+  shift
+fi
+
+detect_target() {
+  if [ -n "$TARGET" ]; then
+    echo "$TARGET"
+    return 0
+  fi
+
+  # 1. Check for booted iOS simulator via idb
+  if command -v idb &>/dev/null && idb list-targets 2>/dev/null | grep -iq "booted"; then
+    echo "ios"
+    return 0
+  fi
+
+  # 2. Check for active Android device / emulator via adb
+  if command -v adb &>/dev/null && adb devices 2>/dev/null | grep -Eq '\b(device|emulator-[0-9]+)\b'; then
+    echo "android"
+    return 0
+  fi
+
+  # 3. Default fallback based on installed tools
+  if command -v idb &>/dev/null; then
+    echo "ios"
+  else
+    echo "android"
+  fi
+}
+
+cmd_devices() {
+  echo "=== iOS Simulators (idb @ $IDB_COMPANION) ==="
+  if command -v idb &>/dev/null; then
+    if ! idb list-targets 2>/dev/null; then
+      echo "  [offline] Cannot reach idb_companion at $IDB_COMPANION."
+      echo "            On macOS host, run: idb_companion --port $IDB_PORT"
+    fi
+  else
+    echo "  [missing] idb CLI is not installed."
+  fi
+
+  echo ""
+  echo "=== Android Devices / Emulators (adb @ $ADB_SERVER_SOCKET) ==="
+  if command -v adb &>/dev/null; then
+    if ! adb devices -l 2>/dev/null; then
+      echo "  [offline] Cannot reach ADB server at $ADB_SERVER_SOCKET."
+      echo "            On host, run: adb -a -P $ADB_PORT nodaemon server"
+    fi
+  else
+    echo "  [missing] adb CLI is not installed."
+  fi
+}
+
+cmd_bridge_status() {
+  echo "Checking host simulator bridges from inside devcontainer..."
+  echo ""
+
+  # Test host.docker.internal DNS
+  if getent hosts host.docker.internal &>/dev/null || ping -c 1 -W 1 host.docker.internal &>/dev/null; then
+    echo "[OK] host.docker.internal resolves."
+  else
+    echo "[WARNING] host.docker.internal could not be resolved directly."
+  fi
+
+  # Test iOS Bridge
+  echo -n "iOS Bridge (idb_companion at $IDB_COMPANION): "
+  if command -v idb &>/dev/null && idb list-targets &>/dev/null; then
+    echo "CONNECTED"
+    idb list-targets | head -n 5
+  else
+    echo "UNREACHABLE"
+    echo "  -> To enable on macOS host: brew install meta/fb/idb-companion && idb_companion --port $IDB_PORT"
+  fi
+
+  # Test Android Bridge
+  echo -n "Android Bridge (ADB at $ADB_SERVER_SOCKET): "
+  if command -v adb &>/dev/null && adb get-state &>/dev/null; then
+    echo "CONNECTED"
+    adb devices
+  else
+    echo "UNREACHABLE"
+    echo "  -> To enable on host: adb -a -P $ADB_PORT nodaemon server"
+  fi
+}
+
+cmd_screenshot() {
+  local out="${1:-screenshot.png}"
+  local t
+  t="$(detect_target)"
+
+  if [ "$t" = "ios" ]; then
+    if ! command -v idb &>/dev/null; then
+      echo "[sim] ERROR: idb is not installed." >&2
+      exit 1
+    fi
+    idb screenshot "$out" || {
+      echo "[sim] ERROR: idb screenshot failed. Is idb_companion running on host?" >&2
+      exit 1
+    }
+  else
+    if ! command -v adb &>/dev/null; then
+      echo "[sim] ERROR: adb is not installed." >&2
+      exit 1
+    fi
+    adb exec-out screencap -p > "$out" || {
+      echo "[sim] ERROR: adb screencap failed. Is host ADB server running?" >&2
+      exit 1
+    }
+  fi
+
+  echo "Screenshot saved to $out"
+}
+
+cmd_ui() {
+  local t
+  t="$(detect_target)"
+
+  if [ "$t" = "ios" ]; then
+    if ! command -v idb &>/dev/null; then
+      echo "[sim] ERROR: idb is not installed." >&2
+      exit 1
+    fi
+    idb ui describe-all --nested
+  else
+    if ! command -v adb &>/dev/null; then
+      echo "[sim] ERROR: adb is not installed." >&2
+      exit 1
+    fi
+    adb shell uiautomator dump /sdcard/ui_dump.xml >/dev/null 2>&1 || true
+    adb exec-out cat /sdcard/ui_dump.xml
+  fi
+}
+
+cmd_tap() {
+  local x="$1"
+  local y="$2"
+  if [ -z "$x" ] || [ -z "$y" ]; then
+    echo "Usage: sim tap <x> <y>" >&2
+    exit 1
+  fi
+
+  local t
+  t="$(detect_target)"
+
+  if [ "$t" = "ios" ]; then
+    idb ui tap "$x" "$y"
+  else
+    adb shell input tap "$x" "$y"
+  fi
+  echo "Tapped ($x, $y) on $t"
+}
+
+cmd_text() {
+  local text="$*"
+  if [ -z "$text" ]; then
+    echo "Usage: sim text <string>" >&2
+    exit 1
+  fi
+
+  local t
+  t="$(detect_target)"
+
+  if [ "$t" = "ios" ]; then
+    idb ui text "$text"
+  else
+    local escaped
+    escaped="$(printf '%s' "$text" | sed 's/ /%s/g')"
+    adb shell input text "$escaped"
+  fi
+  echo "Typed text into $t field"
+}
+
+cmd_key() {
+  local key="$1"
+  if [ -z "$key" ]; then
+    echo "Usage: sim key <key_code_or_name>" >&2
+    exit 1
+  fi
+
+  local t
+  t="$(detect_target)"
+
+  if [ "$t" = "ios" ]; then
+    case "$key" in
+      HOME|home) idb ui button HOME ;;
+      LOCK|lock) idb ui button LOCK ;;
+      *) idb ui key "$key" ;;
+    esac
+  else
+    case "$key" in
+      HOME|home) adb shell input keyevent 3 ;;
+      BACK|back) adb shell input keyevent 4 ;;
+      ENTER|enter) adb shell input keyevent 66 ;;
+      *) adb shell input keyevent "$key" ;;
+    esac
+  fi
+  echo "Sent key $key to $t"
+}
+
+cmd_swipe() {
+  local x1="$1" y1="$2" x2="$3" y2="$4" ms="${5:-300}"
+  if [ -z "$x1" ] || [ -z "$y1" ] || [ -z "$x2" ] || [ -z "$y2" ]; then
+    echo "Usage: sim swipe <x1> <y1> <x2> <y2> [duration_ms]" >&2
+    exit 1
+  fi
+
+  local t
+  t="$(detect_target)"
+
+  if [ "$t" = "ios" ]; then
+    idb ui swipe "$x1" "$y1" "$x2" "$y2"
+  else
+    adb shell input swipe "$x1" "$y1" "$x2" "$y2" "$ms"
+  fi
+  echo "Swiped ($x1, $y1) -> ($x2, $y2) on $t"
+}
+
+cmd_launch() {
+  local app_id="$1"
+  if [ -z "$app_id" ]; then
+    echo "Usage: sim launch <bundle_or_package_id>" >&2
+    exit 1
+  fi
+
+  local t
+  t="$(detect_target)"
+
+  if [ "$t" = "ios" ]; then
+    idb launch "$app_id"
+  else
+    adb shell monkey -p "$app_id" -c android.intent.category.LAUNCHER 1
+  fi
+  echo "Launched $app_id on $t"
+}
+
+cmd_install() {
+  local path="$1"
+  if [ -z "$path" ]; then
+    echo "Usage: sim install <app_path>" >&2
+    exit 1
+  fi
+
+  local t
+  t="$(detect_target)"
+
+  if [ "$t" = "ios" ]; then
+    idb install "$path"
+  else
+    adb install -r "$path"
+  fi
+  echo "Installed $path on $t"
+}
+
+case "$1" in
+  devices) cmd_devices ;;
+  bridge-status|status) cmd_bridge_status ;;
+  screenshot|shot|screencap) shift; cmd_screenshot "$@" ;;
+  ui|inspect|tree|hierarchy) shift; cmd_ui "$@" ;;
+  tap|click) shift; cmd_tap "$@" ;;
+  text|type) shift; cmd_text "$@" ;;
+  key|button) shift; cmd_key "$@" ;;
+  swipe|drag) shift; cmd_swipe "$@" ;;
+  launch|run) shift; cmd_launch "$@" ;;
+  install) shift; cmd_install "$@" ;;
+  -h|--help|help|"") show_help ;;
+  *)
+    echo "Unknown command: $1" >&2
+    echo "Run 'sim --help' for usage." >&2
+    exit 1
+    ;;
+esac
